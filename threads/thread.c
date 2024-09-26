@@ -28,6 +28,13 @@
    that are ready to run but not actually running. */
 static struct list ready_list;
 
+/* list of processes in THREAD_BLOCKED state, that is, processes
+	 that are waiting for awake */
+static struct list wait_list;
+
+/* Thread destruction requests */
+static struct list destruction_req;
+
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -37,8 +44,6 @@ static struct thread *initial_thread;
 /* Lock used by allocate_tid(). */
 static struct lock tid_lock;
 
-/* Thread destruction requests */
-static struct list destruction_req;
 
 /* Statistics. */
 static long long idle_ticks;    /* # of timer ticks spent idle. */
@@ -105,7 +110,7 @@ thread_init (void) {
 	};
 	lgdt (&gdt_ds);
 
-	/* Init the globla thread context */
+	/* Init the global thread context */
 	lock_init (&tid_lock);
 	list_init (&ready_list);
 	list_init (&destruction_req);
@@ -210,6 +215,30 @@ thread_create (const char *name, int priority,
 	return tid;
 }
 
+/* list_insert_ordered에서 쓸 함수 정의 */
+bool insertSort(const struct list_elem* A, const struct list_elem *B) {
+	  struct thread *thread_a = list_entry(A, struct thread, elem);
+    struct thread *thread_b = list_entry(B, struct thread, elem);
+		return thread_a->awake_ticks > thread_b->awake_ticks;
+}
+
+/* wait_list에서 ready_list로 옮기기 */
+void thread_awake(int64_t ticks) {
+	while (list_entry(list_front(&wait_list), struct thread, elem)->awake_ticks <= ticks) {
+		struct thread* awake_thread = list_entry(list_pop_front (&wait_list), struct thread, elem);
+		// curr -> status를 ready로 바꿔준다. block, unblock 함수 그대로 이용
+		// ready에 넣어줄 때도 list order로 넣어줘야 한다.
+		list_insert_ordered(&ready_list, &awake_thread->elem, insertSort, NULL);
+		thread_unblock(awake_thread);
+	}
+}
+
+/* running 상태에서 wait_list로 옮기기 */
+void thread_wait() {
+	list_insert_ordered(&wait_list, thread_current(), insertSort, NULL);
+	thread_block();
+}
+
 /* Puts the current thread to sleep.  It will not be scheduled
    again until awoken by thread_unblock().
 
@@ -306,6 +335,10 @@ thread_yield (void) {
 		list_push_back (&ready_list, &curr->elem);
 	do_schedule (THREAD_READY);
 	intr_set_level (old_level);
+}
+
+struct list* thread_get_wait_list(void) {			/* wait list의 주소 반환 */
+	return &wait_list;
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
@@ -525,10 +558,13 @@ thread_launch (struct thread *th) {
  * This function modify current thread's status to status and then
  * finds another thread to run and switches to it.
  * It's not safe to call printf() in the schedule(). */
+
+/* 현재 running 상태인 스레드의 상태를 변경하는 함수 */
 static void
 do_schedule(int status) {
 	ASSERT (intr_get_level () == INTR_OFF);
 	ASSERT (thread_current()->status == THREAD_RUNNING);
+	/* CPU에서 실행 중인 스레드가 사용 중인 자원에 접근하여 해제하는 일은 위험하기 때문에 일단 destruction_req 리스트에 종료된 스레드들을 넣어놓고 나중에 처리함 */
 	while (!list_empty (&destruction_req)) {
 		struct thread *victim =
 			list_entry (list_pop_front (&destruction_req), struct thread, elem);

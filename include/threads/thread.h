@@ -9,7 +9,6 @@
 #include "vm/vm.h"
 #endif
 
-
 /* States in a thread's life cycle. */
 enum thread_status {
 	THREAD_RUNNING,     /* Running thread. */
@@ -85,14 +84,18 @@ typedef int tid_t;
  * only because they are mutually exclusive: only a thread in the
  * ready state is on the run queue, whereas only a thread in the
  * blocked state is on a semaphore wait list. */
+
+
+
 struct thread {
 	/* Owned by thread.c. */
 	tid_t tid;                          /* Thread identifier. */
 	enum thread_status status;          /* Thread state. */
 	char name[16];                      /* Name (for debugging purposes). */
 	int priority;                       /* Priority. */
+	int64_t awake_ticks;								/* awake ticks */
 
-	/* Shared between thread.c and synch.c. */
+	/* Shared between thread.c and synch.c(semaphore->waiters). */
 	struct list_elem elem;              /* List element. */
 
 #ifdef USERPROG
@@ -123,6 +126,9 @@ void thread_print_stats (void);
 typedef void thread_func (void *aux);
 tid_t thread_create (const char *name, int priority, thread_func *, void *);
 
+void thread_awake(int64_t ticks);
+void thread_wait();
+
 void thread_block (void);
 void thread_unblock (struct thread *);
 
@@ -132,6 +138,8 @@ const char *thread_name (void);
 
 void thread_exit (void) NO_RETURN;
 void thread_yield (void);
+
+struct list* thread_get_wait_list(void);			/* wait list의 주소 반환 */
 
 int thread_get_priority (void);
 void thread_set_priority (int);
