@@ -114,7 +114,7 @@ thread_init (void) {
 	lock_init (&tid_lock);
 	list_init (&ready_list);
 	list_init (&destruction_req);
-
+	list_init (&wait_list);
 	/* Set up a thread structure for the running thread. */
 	initial_thread = running_thread ();
 	init_thread (initial_thread, "main", PRI_DEFAULT);
@@ -216,27 +216,35 @@ thread_create (const char *name, int priority,
 }
 
 /* list_insert_ordered에서 쓸 함수 정의 */
-bool insertSort(const struct list_elem* A, const struct list_elem *B) {
-	  struct thread *thread_a = list_entry(A, struct thread, elem);
+bool insert_sort_wait(const struct list_elem* A, const struct list_elem *B, void *aux) {
+    struct thread *thread_a = list_entry(A, struct thread, elem);
     struct thread *thread_b = list_entry(B, struct thread, elem);
-		return thread_a->awake_ticks > thread_b->awake_ticks;
+    return thread_a->awake_ticks < thread_b->awake_ticks;
+}
+
+bool insert_sort_ready(const struct list_elem* A, const struct list_elem *B, void *aux) {
+    struct thread *thread_a = list_entry(A, struct thread, elem);
+    struct thread *thread_b = list_entry(B, struct thread, elem);
+    return thread_a->priority > thread_b->priority;
 }
 
 /* wait_list에서 ready_list로 옮기기 */
 void thread_awake(int64_t ticks) {
-	while (list_entry(list_front(&wait_list), struct thread, elem)->awake_ticks <= ticks) {
-		struct thread* awake_thread = list_entry(list_pop_front (&wait_list), struct thread, elem);
+	while (!list_empty(&wait_list) && list_entry(list_front(&wait_list), struct thread, elem)->awake_ticks <= ticks) {
+		struct thread* awake_thread = list_entry(list_pop_front(&wait_list), struct thread, elem);
 		// curr -> status를 ready로 바꿔준다. block, unblock 함수 그대로 이용
 		// ready에 넣어줄 때도 list order로 넣어줘야 한다.
-		list_insert_ordered(&ready_list, &awake_thread->elem, insertSort, NULL);
+		
 		thread_unblock(awake_thread);
 	}
 }
 
 /* running 상태에서 wait_list로 옮기기 */
 void thread_wait() {
-	list_insert_ordered(&wait_list, thread_current(), insertSort, NULL);
+	enum intr_level old_level = intr_disable();
+	list_insert_ordered(&wait_list, &thread_current()->elem, insert_sort_wait, NULL);
 	thread_block();
+	intr_set_level (old_level);
 }
 
 /* Puts the current thread to sleep.  It will not be scheduled
@@ -269,7 +277,7 @@ thread_unblock (struct thread *t) {
 
 	old_level = intr_disable ();
 	ASSERT (t->status == THREAD_BLOCKED);
-	list_push_back (&ready_list, &t->elem);
+	list_insert_ordered(&ready_list, &t->elem, insert_sort_ready, NULL);
 	t->status = THREAD_READY;
 	intr_set_level (old_level);
 }
@@ -332,7 +340,7 @@ thread_yield (void) {
 
 	old_level = intr_disable ();
 	if (curr != idle_thread)
-		list_push_back (&ready_list, &curr->elem);
+		list_insert_ordered(&ready_list, &curr->elem, insert_sort_ready, NULL);
 	do_schedule (THREAD_READY);
 	intr_set_level (old_level);
 }
@@ -454,7 +462,7 @@ next_thread_to_run (void) {
 	if (list_empty (&ready_list))
 		return idle_thread;
 	else
-		return list_entry (list_pop_front (&ready_list), struct thread, elem);
+		return list_entry(list_pop_front(&ready_list), struct thread, elem);
 }
 
 /* Use iretq to launch the thread */
