@@ -16,7 +16,6 @@ struct semaphore_elem {
 	struct semaphore semaphore;         /* This semaphore. */
 };
 
-
 void sema_init (struct semaphore *, unsigned value);
 void sema_down (struct semaphore *);
 bool sema_try_down (struct semaphore *);
@@ -36,8 +35,8 @@ bool lock_try_acquire (struct lock *);
 void lock_release (struct lock *);
 bool lock_held_by_current_thread (const struct lock *);
 
-void remove_with_lock(struct lock *lock);
-void refresh_prioirty(void);
+// void remove_with_lock(struct lock *lock);
+// void refresh_prioirty(void);
 
 /* Condition variable. */
 struct condition {
