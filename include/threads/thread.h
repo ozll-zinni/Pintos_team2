@@ -98,6 +98,11 @@ struct thread {
 	/* Shared between thread.c and synch.c(semaphore->waiters). */
 	struct list_elem elem;              /* List element. */
 
+	int init_priority;
+	struct lock *wait_on_lock;
+	struct list donations;				
+	struct list_elem donation_elem;
+
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4;                     /* Page map level 4 */
@@ -126,6 +131,10 @@ void thread_print_stats (void);
 typedef void thread_func (void *aux);
 tid_t thread_create (const char *name, int priority, thread_func *, void *);
 
+
+void test_max_priority (void);
+bool cmp_priority_wait(const struct list_elem* A, const struct list_elem *B, void *aux);
+bool cmp_priority_ready(const struct list_elem* A, const struct list_elem *B, void *aux);
 void thread_awake(int64_t ticks);
 void thread_wait();
 
@@ -150,5 +159,6 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 void do_iret (struct intr_frame *tf);
+void donate_prioity(void);
 
 #endif /* threads/thread.h */
