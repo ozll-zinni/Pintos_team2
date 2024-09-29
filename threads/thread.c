@@ -212,6 +212,11 @@ thread_create (const char *name, int priority,
 	/* Add to run queue. */
 	thread_unblock (t);
 
+	if (check_priority_threads())
+	{
+		thread_yield();
+	}
+
 	return tid;
 }
 
@@ -253,7 +258,9 @@ void donate_priority() {
     while (depth < 8 && curr->wait_on_lock != NULL) {
         holder = curr->wait_on_lock->holder;
 
-        holder->priority = curr->priority;
+        if (holder->priority < curr->priority) {
+            holder->priority = curr->priority;  // 우선순위 기부
+        }
 
         curr = holder;
         depth++;
@@ -372,10 +379,26 @@ struct list* thread_get_wait_list(void) {			/* wait list의 주소 반환 */
 	return &wait_list;
 }
 
+bool check_priority_threads()
+{
+	if (list_empty(&ready_list))
+	{
+		return false;
+	}
+	if (thread_current()->priority < list_entry(list_front(&ready_list), struct thread, elem)->priority)
+	{
+		return true;
+	}
+	return false;
+}
+
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) {
-	thread_current ()->priority = new_priority;
+	thread_current() -> priority = new_priority;
+	thread_current() -> init_priority = new_priority;
+
+	refresh_priority();
 	test_max_priority();
 }
 

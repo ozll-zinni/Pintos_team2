@@ -152,6 +152,9 @@ struct list* thread_get_wait_list(void);			/* wait list의 주소 반환 */
 
 int thread_get_priority (void);
 void thread_set_priority (int);
+bool
+thread_compare_donate_priority (const struct list_elem *l, 
+				const struct list_elem *s, void *aux UNUSED);
 
 int thread_get_nice (void);
 void thread_set_nice (int);
@@ -163,5 +166,9 @@ void donate_priority();
 
 void remove_with_lock(struct lock *lock);
 void refresh_priority (void);
+bool check_priority_threads();
+bool
+thread_compare_donate_priority (const struct list_elem *l, 
+				const struct list_elem *s, void *aux UNUSED);
 
 #endif /* threads/thread.h */

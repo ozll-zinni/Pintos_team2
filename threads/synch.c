@@ -110,11 +110,20 @@ sema_up (struct semaphore *sema) {
 
 	ASSERT (sema != NULL);
 
-	old_level = intr_disable ();
-	if (!list_empty (&sema->waiters))
-		thread_unblock (list_entry (list_pop_front (&sema->waiters),
-					struct thread, elem));
+	struct thread *next_thread;
+	old_level = intr_disable();
+	if (!list_empty(&sema->waiters))
+	{
+		next_thread = list_entry(list_pop_front(&sema->waiters), struct thread, elem);
+		thread_unblock(next_thread);
+	
+   }
 	sema->value++;
+
+   if (check_priority_threads())
+	{
+		thread_yield();
+	}
 	intr_set_level (old_level);
 }
 
@@ -209,9 +218,10 @@ void lock_acquire(struct lock *lock) {
     struct thread *cur = thread_current();  // 현재 스레드를 가져옴
 
     if (lock->holder != NULL) {
-        cur->wait_on_lock = lock;  // 현재 스레드가 기다리고 있는 락을 설정
-        list_insert_ordered(&lock->holder->donations, &cur->donation_elem, thread_compare_donate_priority, 0); // 우선순위 기부
-        donate_priority();  // 우선순위 기부 로직 실행
+      struct thread *cur = thread_current();
+      cur->wait_on_lock = lock;  // 현재 스레드가 기다리고 있는 락을 설정
+      list_insert_ordered(&lock->holder->donations, &cur->donation_elem, thread_compare_donate_priority, 0); // 우선순위 기부
+      donate_priority();  // 우선순위 기부 로직 실행
     }
 
     sema_down(&lock->semaphore);  // 세마포어 다운 (락을 획득)
