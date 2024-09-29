@@ -250,36 +250,36 @@ lock_release (struct lock *lock) {
 	ASSERT (lock_held_by_current_thread (lock));
 
    remove_with_lock(&lock);
-   refresh_prioirty();
+   refresh_priority();
 
 	lock->holder = NULL;
 	sema_up (&lock->semaphore);
 }
 
-void remove_with_lock(struct lock *lock){
+// void remove_with_lock(struct lock *lock){
    
-   struct thread *holder = &lock->holder;
-   struct list_elem *elemp = list_begin(&holder->donations);
+//    struct thread *holder = &lock->holder;
+//    struct list_elem *elemp = list_begin(&holder->donations);
 
-   while(elemp != list_end(&holder->donations)) {
-      struct thread *t = list_entry(elemp, struct thread, donation_elem);
-      if (t->wait_on_lock == lock){
-         t->wait_on_lock == NULL;
-         elemp = list_remove(elemp);
-      }else{
-         elemp = list_next(elemp);
-      }
-   }
-}
+//    while(elemp != list_end(&holder->donations)) {
+//       struct thread *t = list_entry(elemp, struct thread, donation_elem);
+//       if (t->wait_on_lock == lock){
+//          t->wait_on_lock == NULL;
+//          elemp = list_remove(elemp);
+//       }else{
+//          elemp = list_next(elemp);
+//       }
+//    }
+// }
 
-void refresh_prioirty(){
-   struct thread *curr = thread_current();
-   curr->priority = curr->init_priority;
-   struct thread *t = list_entry(list_front(&curr->donations),struct thread, donation_elem);
-   if(curr->priority < t->priority){
-      curr->priority = t->priority;
-   }
-}
+// void refresh_prioirty(){
+//    struct thread *curr = thread_current();
+//    curr->priority = curr->init_priority;
+//    struct thread *t = list_entry(list_front(&curr->donations),struct thread, donation_elem);
+//    if(curr->priority < t->priority){
+//       curr->priority = t->priority;
+//    }
+// }
 
 /* Returns true if the current thread holds LOCK, false
    otherwise.  (Note that testing whether some other thread holds
