@@ -200,24 +200,25 @@ lock_init (struct lock *lock) {
    interrupt handler.  This function may be called with
    interrupts disabled, but interrupts will be turned back on if
    we need to sleep. */
-void
-lock_acquire (struct lock *lock) {
-	ASSERT (lock != NULL);
-	ASSERT (!intr_context ());
-	ASSERT (!lock_held_by_current_thread (lock));
-   struct thread *curr = thread_current();
 
-   if(lock->holder!=NULL)
-   {
-      curr->wait_on_lock = lock;
-      curr->donation_elem.next = &lock->holder->elem;
-      list_insert_ordered(&lock->holder->donations, &curr->elem, cmp_priority_ready, NULL);
-      donate_priority();
-   }
+void lock_acquire(struct lock *lock) {
+    ASSERT(lock != NULL);
+    ASSERT(!intr_context());
+    ASSERT(!lock_held_by_current_thread(lock));
 
-	sema_down (&lock->semaphore);
-	lock->holder = thread_current ();
+    struct thread *cur = thread_current();  // 현재 스레드를 가져옴
+
+    if (lock->holder != NULL) {
+        cur->wait_on_lock = lock;  // 현재 스레드가 기다리고 있는 락을 설정
+        list_insert_ordered(&lock->holder->donations, &cur->donation_elem, thread_compare_donate_priority, 0); // 우선순위 기부
+        donate_priority();  // 우선순위 기부 로직 실행
+    }
+
+    sema_down(&lock->semaphore);  // 세마포어 다운 (락을 획득)
+    cur->wait_on_lock = NULL;  // 락을 얻었으므로 대기 중인 락을 해제
+    lock->holder = cur;  // 현재 스레드를 락의 소유자로 설정
 }
+
 
 /* Tries to acquires LOCK and returns true if successful or false
    on failure.  The lock must not already be held by the current
@@ -245,41 +246,18 @@ lock_try_acquire (struct lock *lock) {
    make sense to try to release a lock within an interrupt
    handler. */
 void
-lock_release (struct lock *lock) {
-	ASSERT (lock != NULL);
-	ASSERT (lock_held_by_current_thread (lock));
-
-   remove_with_lock(&lock);
-   refresh_priority();
-
-	lock->holder = NULL;
-	sema_up (&lock->semaphore);
+lock_release (struct lock *lock) 
+{
+  ASSERT (lock != NULL);
+  ASSERT (lock_held_by_current_thread (lock));
+  
+  remove_with_lock(lock);
+  refresh_priority();  
+  
+  lock->holder = NULL;
+  sema_up (&lock->semaphore);
 }
 
-// void remove_with_lock(struct lock *lock){
-   
-//    struct thread *holder = &lock->holder;
-//    struct list_elem *elemp = list_begin(&holder->donations);
-
-//    while(elemp != list_end(&holder->donations)) {
-//       struct thread *t = list_entry(elemp, struct thread, donation_elem);
-//       if (t->wait_on_lock == lock){
-//          t->wait_on_lock == NULL;
-//          elemp = list_remove(elemp);
-//       }else{
-//          elemp = list_next(elemp);
-//       }
-//    }
-// }
-
-// void refresh_prioirty(){
-//    struct thread *curr = thread_current();
-//    curr->priority = curr->init_priority;
-//    struct thread *t = list_entry(list_front(&curr->donations),struct thread, donation_elem);
-//    if(curr->priority < t->priority){
-//       curr->priority = t->priority;
-//    }
-// }
 
 /* Returns true if the current thread holds LOCK, false
    otherwise.  (Note that testing whether some other thread holds
