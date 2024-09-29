@@ -221,7 +221,7 @@ thread_create (const char *name, int priority,
 }
 
 void test_max_priority(void){
-	if(cmp_priority_ready(list_front(&ready_list), &thread_current()->elem, NULL)) {
+	if(!list_empty(&ready_list) && (list_front(&ready_list), &thread_current()->elem, NULL)) {
 		thread_yield();
 	}
 }
@@ -379,14 +379,11 @@ struct list* thread_get_wait_list(void) {			/* wait list의 주소 반환 */
 	return &wait_list;
 }
 
-bool check_priority_threads()
-{
-	if (list_empty(&ready_list))
-	{
+bool check_priority_threads() {
+	if (list_empty(&ready_list)) {
 		return false;
 	}
-	if (thread_current()->priority < list_entry(list_front(&ready_list), struct thread, elem)->priority)
-	{
+	if (thread_current()->priority < list_entry(list_front(&ready_list), struct thread, elem)->priority) {
 		return true;
 	}
 	return false;
