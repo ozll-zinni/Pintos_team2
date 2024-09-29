@@ -309,7 +309,6 @@ thread_unblock (struct thread *t) {
 	list_insert_ordered(&ready_list, &t->elem, cmp_priority_ready, NULL);
 	t->status = THREAD_READY;
 	intr_set_level (old_level);
-	void test_max_priority(void);
 }
 
 /* Returns the name of the running thread. */
@@ -380,14 +379,14 @@ struct list* thread_get_wait_list(void) {			/* wait list의 주소 반환 */
 }
 
 bool check_priority_threads() {
-	if (list_empty(&ready_list)) {
-		return false;
-	}
-	if (thread_current()->priority < list_entry(list_front(&ready_list), struct thread, elem)->priority) {
-		return true;
-	}
-	return false;
+    if (!list_empty(&ready_list)) {
+        if (thread_current()->priority < list_entry(list_front(&ready_list), struct thread, elem)->priority) {
+            return true;
+        }
+    }
+    return false;
 }
+
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
@@ -396,7 +395,9 @@ thread_set_priority (int new_priority) {
 	thread_current() -> init_priority = new_priority;
 
 	refresh_priority();
-	test_max_priority();
+	if (check_priority_threads()){
+		thread_yield();
+	}
 }
 
 /* Returns the current thread's priority. */
