@@ -245,6 +245,24 @@ void thread_awake(int64_t ticks) {
 	}
 }
 
+void donate_priority(){
+	struct thread *curr = thread_current();
+	struct thread *holder;
+	int depth = 0;
+
+	while(depth < 8 && curr->wait_on_lock != NULL){
+		holder = curr->wait_on_lock->holder;
+		
+		if(holder->priority < curr->priority){
+		holder->priority = curr->priority;
+		}
+
+		curr = holder;
+		depth ++;
+	}
+
+}
+
 /* running 상태에서 wait_list로 옮기기 */
 void thread_wait() {
 	enum intr_level old_level = intr_disable();
@@ -286,7 +304,7 @@ thread_unblock (struct thread *t) {
 	list_insert_ordered(&ready_list, &t->elem, cmp_priority_ready, NULL);
 	t->status = THREAD_READY;
 	intr_set_level (old_level);
-	void test_max_priority(void);
+	test_max_priority();
 }
 
 /* Returns the name of the running thread. */
@@ -359,7 +377,10 @@ struct list* thread_get_wait_list(void) {			/* wait list의 주소 반환 */
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) {
-	thread_current ()->priority = new_priority;
+	struct thread *curr = thread_current();
+	curr->priority = new_priority;
+
+	test_max_priority();
 }
 
 /* Returns the current thread's priority. */
@@ -457,6 +478,12 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *);
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
+	t->wait_on_lock = NULL;
+	t->init_priority = priority;
+	t->awake_ticks = 0;
+	
+	list_init(&t->donations);
+
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should

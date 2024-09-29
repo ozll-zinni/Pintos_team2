@@ -205,9 +205,18 @@ lock_acquire (struct lock *lock) {
 	ASSERT (lock != NULL);
 	ASSERT (!intr_context ());
 	ASSERT (!lock_held_by_current_thread (lock));
+   struct thread *curr = thread_current();
+
+   if(lock->holder!=NULL)
+   {
+      curr->wait_on_lock = lock;
+      list_insert_ordered(&lock->holder->donations, &curr->elem, cmp_priority_ready, NULL);
+      donate_priority();
+   }
 
 	sema_down (&lock->semaphore);
-	lock->holder = thread_current ();
+   curr->wait_on_lock = NULL;
+	lock->holder = curr;
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -240,8 +249,36 @@ lock_release (struct lock *lock) {
 	ASSERT (lock != NULL);
 	ASSERT (lock_held_by_current_thread (lock));
 
+   remove_with_lock(lock);
+   refresh_priority();
+
 	lock->holder = NULL;
 	sema_up (&lock->semaphore);
+}
+
+void remove_with_lock(struct lock *lock){
+   
+   struct thread *holder = &lock->holder;
+   struct list_elem *elemp = list_begin(&holder->donations);
+
+   while(elemp != list_end(&holder->donations)) {
+      struct thread *t = list_entry(elemp, struct thread, donation_elem);
+      if (t->wait_on_lock == lock){
+         t->wait_on_lock == NULL;
+         elemp = list_remove(elemp);
+      }else{
+         elemp = list_next(elemp);
+      }
+   }
+}
+
+void refresh_priority(){
+   struct thread *curr = thread_current();
+   curr->priority = curr->init_priority;
+   struct thread *t = list_entry(list_front(&curr->donations),struct thread, donation_elem);
+   if(curr->priority < t->priority){
+      curr->priority = t->priority;
+   }
 }
 
 /* Returns true if the current thread holds LOCK, false
