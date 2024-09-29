@@ -215,14 +215,20 @@ thread_create (const char *name, int priority,
 	return tid;
 }
 
+void test_max_priority(void){
+	if(cmp_priority_ready(list_front(&ready_list), &thread_current()->elem, NULL)) {
+		thread_yield();
+	}
+}
+
 /* list_insert_ordered에서 쓸 함수 정의 */
-bool insert_sort_wait(const struct list_elem* A, const struct list_elem *B, void *aux) {
+bool cmp_priority_wait(const struct list_elem* A, const struct list_elem *B, void *aux) {
     struct thread *thread_a = list_entry(A, struct thread, elem);
     struct thread *thread_b = list_entry(B, struct thread, elem);
     return thread_a->awake_ticks < thread_b->awake_ticks;
 }
 
-bool insert_sort_ready(const struct list_elem* A, const struct list_elem *B, void *aux) {
+bool cmp_priority_ready(const struct list_elem* A, const struct list_elem *B, void *aux) {
     struct thread *thread_a = list_entry(A, struct thread, elem);
     struct thread *thread_b = list_entry(B, struct thread, elem);
     return thread_a->priority > thread_b->priority;
@@ -242,7 +248,7 @@ void thread_awake(int64_t ticks) {
 /* running 상태에서 wait_list로 옮기기 */
 void thread_wait() {
 	enum intr_level old_level = intr_disable();
-	list_insert_ordered(&wait_list, &thread_current()->elem, insert_sort_wait, NULL);
+	list_insert_ordered(&wait_list, &thread_current()->elem, cmp_priority_wait, NULL);
 	thread_block();
 	intr_set_level (old_level);
 }
@@ -264,7 +270,7 @@ thread_block (void) {
 /* Transitions a blocked thread T to the ready-to-run state.
    This is an error if T is not blocked.  (Use thread_yield() to
    make the running thread ready.)
-
+`
    This function does not preempt the running thread.  This can
    be important: if the caller had disabled interrupts itself,
    it may expect that it can atomically unblock a thread and
@@ -277,9 +283,10 @@ thread_unblock (struct thread *t) {
 
 	old_level = intr_disable ();
 	ASSERT (t->status == THREAD_BLOCKED);
-	list_insert_ordered(&ready_list, &t->elem, insert_sort_ready, NULL);
+	list_insert_ordered(&ready_list, &t->elem, cmp_priority_ready, NULL);
 	t->status = THREAD_READY;
 	intr_set_level (old_level);
+	void test_max_priority(void);
 }
 
 /* Returns the name of the running thread. */
@@ -340,7 +347,7 @@ thread_yield (void) {
 
 	old_level = intr_disable ();
 	if (curr != idle_thread)
-		list_insert_ordered(&ready_list, &curr->elem, insert_sort_ready, NULL);
+		list_insert_ordered(&ready_list, &curr->elem, cmp_priority_ready, NULL);
 	do_schedule (THREAD_READY);
 	intr_set_level (old_level);
 }
