@@ -1,1 +1,19 @@
-./build
+# Object files
+*.o
+
+# Binaries
+my_program
+
+# Build directories
+/build/
+/bin/
+
+# Debug and log files
+*.log
+*.d
+
+# Ignore build directory and all its contents
+/threads/build/
+
+# Ignore only .errors files in the tests directory
+/threads/build/tests/**/*.errors
