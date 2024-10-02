@@ -1,4 +1,3 @@
-#include <assert.h>
 #include "userprog/process.h"
 #include <debug.h>
 #include <inttypes.h>
@@ -163,89 +162,90 @@ error:
 
 /* Switch the current execution context to the f_name.
  * Returns -1 on fail. */
-int
-process_exec (void *f_name) {
-	char *file_name = f_name;
-	bool success;
+int process_exec(void *f_name) {
+    char *file_name = f_name;
+    bool success;
 
-	/* We cannot use the intr_frame in the thread structure.
-	 * This is because when current thread rescheduled,
-	 * it stores the execution information to the member. */
-	struct intr_frame _if;
-	_if.ds = _if.es = _if.ss = SEL_UDSEG;
-	_if.cs = SEL_UCSEG;
-	_if.eflags = FLAG_IF | FLAG_MBS;
+    struct intr_frame _if;
+    _if.ds = _if.es = _if.ss = SEL_UDSEG;
+    _if.cs = SEL_UCSEG;
+    _if.eflags = FLAG_IF | FLAG_MBS;
 
-	/* We first kill the current context */
-	process_cleanup ();
+    process_cleanup();
 
-	char *saveptr;
-	char *token;
-	char **parse[14]; // token 인자들 넣을 포인터 배열
-	char **parse_ptr;
-	int index = 0;
+    char *saveptr;
+    char *token;
+    char *parse[14];  // 파싱한 인자들을 저장할 배열
+    int index = 0;
 
-	token = strtok_r(f_name, " ", &saveptr);
-	while (token != NULL) {
-		parse_ptr[index++] = token;
-		token = strtok_r(NULL, " ", saveptr);
-	}
+    token = strtok_r(file_name, " ", &saveptr);
+    while (token != NULL && index < 14) {
+        parse[index++] = token;
+        token = strtok_r(NULL, " ", &saveptr);
+    }
 
-	/* And then load the binary */
-	success = load (file_name, &_if);
-	ASSERT(index > 0);
-	argument_stack(parse, index-1, &_if.rsp);
+    success = load(parse[0], &_if);  // 첫 번째 인자(프로그램 이름)를 사용
+    if (!success) {
+        palloc_free_page(file_name);
+        return -1;
+    }
 
-	/* If load failed, quit. */
-	palloc_free_page (file_name);
-	if (!success)
-		return -1;
+    argument_stack(parse, index, &_if.rsp);  // 인자를 스택에 적재
+    hex_dump(_if.rsp, _if.rsp, KERN_BASE - _if.rsp, true);
 
-	/* Start switched process. */
-	do_iret (&_if);
-	NOT_REACHED ();
+    palloc_free_page(file_name);
+    if (!success) {
+        return -1;
+    }
+
+    do_iret(&_if);
+    NOT_REACHED();
 }
 
-void argument_stack(char **parse, int count, void **rsp)
-{
-	uintptr_t rsp_ptr_list[14];
+void argument_stack(char **parse, int count, void **rsp) {
+    uintptr_t argv_addr[14];  // 각 인자의 주소를 저장할 배열
+    int len;
 
-	// push program name
-	for (int i = strlen(parse[0]); i > -1; i--) 
-	{
-		*rsp = *rsp - 1;
-		**(char **)rsp = parse[0][i];
-	}
+    // 1. 프로그램 이름 및 인자(문자열) 스택에 push
+    for (int i = count - 1; i >= 0; i--) {
+        len = strlen(parse[i]) + 1;  // 널 문자 포함 길이
+        *rsp -= len;  // 스택 포인터 이동
 
-	// push argument name
-	for(int i = count - 1 ; i > -1 ; i--)
-	{
-		for(int j = strlen(parse[i]) ; j > -1 ; j--)
-		{
-			*rsp = *rsp - 1;
-			**(char **)rsp = parse[i][j];
-		}
-		rsp = 8 * (((uintptr_t) rsp + 8 + 7)/8);
-		// *rsp = (void *)((uintptr_t)(*rsp) & ~0x7);
-		rsp_ptr_list[i] = rsp;
-	}
+        // 문자열을 한 글자씩 스택에 복사
+        for (int j = 0; j < len; j++) {
+            ((char *)(*rsp))[j] = parse[i][j];
+        }
 
-	// push argument address
-	for(int k = count - 1; k > -1; k--)
-	{
-		*rsp = *rsp -1;
-		**(char **)rsp = rsp_ptr_list[count];
-	}
+        argv_addr[i] = (uintptr_t)(*rsp);  // 각 인자의 주소 저장
+    }
 
-	// push argc
-	*rsp = *rsp - 1;
-	**(int **)rsp = count;
+    // 2. 16바이트 정렬을 위해 패딩 추가
+    *rsp = (void *)((uintptr_t)(*rsp) & ~0xf);
 
-	// push return address
-	*rsp = *rsp - 1;
-	**(uintptr_t **)rsp = 0;
+    // 3. NULL 포인터 추가
+    *rsp -= sizeof(char *);
+    *(char **)(*rsp) = 0;
 
+    // 4. 인자 주소를 스택에 push
+    for (int i = count - 1; i >= 0; i--) {
+        *rsp -= sizeof(char *);
+        *(char **)(*rsp) = (char *)argv_addr[i];
+    }
+
+    // 5. argv 포인터 스택에 push
+    char **argv = *rsp;
+    *rsp -= sizeof(char **);
+    *(char ***)(*rsp) = argv;
+
+    // 6. argc (인자의 개수) 스택에 push
+    *rsp -= sizeof(int);
+    *(int *)(*rsp) = count;
+
+    // 7. fake return address 추가
+    *rsp -= sizeof(void *);
+    *(void **)(*rsp) = 0;
 }
+
 
 /* Waits for thread TID to die and returns its exit status.  If
  * it was terminated by the kernel (i.e. killed due to an
