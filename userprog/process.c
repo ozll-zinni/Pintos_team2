@@ -1,3 +1,4 @@
+#include <assert.h>
 #include "userprog/process.h"
 #include <debug.h>
 #include <inttypes.h>
@@ -42,6 +43,8 @@ tid_t
 process_create_initd (const char *file_name) {
 	char *fn_copy;
 	tid_t tid;
+	char *saveptr;
+	char *process_name = strtok_r(file_name, " ", &saveptr);
 
 	/* Make a copy of FILE_NAME.
 	 * Otherwise there's a race between the caller and load(). */
@@ -51,7 +54,7 @@ process_create_initd (const char *file_name) {
 	strlcpy (fn_copy, file_name, PGSIZE);
 
 	/* Create a new thread to execute FILE_NAME. */
-	tid = thread_create (file_name, PRI_DEFAULT, initd, fn_copy);
+	tid = thread_create (process_name, PRI_DEFAULT, initd, fn_copy);
 	if (tid == TID_ERROR)
 		palloc_free_page (fn_copy);
 	return tid;
@@ -176,8 +179,22 @@ process_exec (void *f_name) {
 	/* We first kill the current context */
 	process_cleanup ();
 
+	char *saveptr;
+	char *token;
+	char **parse[14]; // token 인자들 넣을 포인터 배열
+	char **parse_ptr;
+	int index = 0;
+
+	token = strtok_r(f_name, " ", &saveptr);
+	while (token != NULL) {
+		parse_ptr[index++] = token;
+		token = strtok_r(NULL, " ", saveptr);
+	}
+
 	/* And then load the binary */
 	success = load (file_name, &_if);
+	ASSERT(index > 0);
+	argument_stack(parse, index-1, &_if.rsp);
 
 	/* If load failed, quit. */
 	palloc_free_page (file_name);
@@ -189,6 +206,46 @@ process_exec (void *f_name) {
 	NOT_REACHED ();
 }
 
+void argument_stack(char **parse, int count, void **rsp)
+{
+	uintptr_t rsp_ptr_list[14];
+
+	// push program name
+	for (int i = strlen(parse[0]); i > -1; i--) 
+	{
+		*rsp = *rsp - 1;
+		**(char **)rsp = parse[0][i];
+	}
+
+	// push argument name
+	for(int i = count - 1 ; i > -1 ; i--)
+	{
+		for(int j = strlen(parse[i]) ; j > -1 ; j--)
+		{
+			*rsp = *rsp - 1;
+			**(char **)rsp = parse[i][j];
+		}
+		rsp = 8 * (((uintptr_t) rsp + 8 + 7)/8);
+		// *rsp = (void *)((uintptr_t)(*rsp) & ~0x7);
+		rsp_ptr_list[i] = rsp;
+	}
+
+	// push argument address
+	for(int k = count - 1; k > -1; k--)
+	{
+		*rsp = *rsp -1;
+		**(char **)rsp = rsp_ptr_list[count];
+	}
+
+	// push argc
+	*rsp = *rsp - 1;
+	**(int **)rsp = count;
+
+	// push return address
+	*rsp = *rsp - 1;
+	**(uintptr_t **)rsp = 0;
+
+}
 
 /* Waits for thread TID to die and returns its exit status.  If
  * it was terminated by the kernel (i.e. killed due to an
