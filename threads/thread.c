@@ -253,9 +253,8 @@ void thread_awake(int64_t ticks) {
 void donate_priority() {
     struct thread *curr = thread_current();
     struct thread *holder;
-    int depth = 0;
 
-    while (depth < 8 && curr->wait_on_lock != NULL) {
+    while (curr->wait_on_lock != NULL) {
         holder = curr->wait_on_lock->holder;
 
         if (holder->priority < curr->priority) {
@@ -263,7 +262,6 @@ void donate_priority() {
         }
 
         curr = holder;
-        depth++;
     }
 }
 
@@ -512,6 +510,7 @@ init_thread (struct thread *t, const char *name, int priority) {
    will be in the run queue.)  If the run queue is empty, return
    idle_thread. */
 static struct thread *
+
 next_thread_to_run (void) {
 	if (list_empty (&ready_list))
 		return idle_thread;

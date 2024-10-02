@@ -60,6 +60,26 @@
     "thread.h": "c",
     "random.h": "c",
     "interrupt.h": "c",
-    "synch.h": "c"
+    "synch.h": "c",
+    "file.h": "c",
+    "*.inc": "c",
+    "lib.h": "c",
+    "main.h": "c",
+    "palloc.h": "c",
+    "process.h": "c",
+    "debug.h": "c",
+    "round.h": "c",
+    "stdlib.h": "c",
+    "stdio.h": "c",
+    "string.h": "c",
+    "intrinsic.h": "c",
+    "vaddr.h": "c",
+    "mmu.h": "c",
+    "filesys.h": "c",
+    "tss.h": "c",
+    "directory.h": "c",
+    "gdt.h": "c",
+    "flags.h": "c",
+    "syscall.h": "c"
   }
 }
