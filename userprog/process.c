@@ -43,7 +43,6 @@ process_create_initd (const char *file_name) {
 	char *fn_copy;
 	tid_t tid;
 	char *saveptr;
-	char *process_name = strtok_r(file_name, " ", &saveptr);
 
 	/* Make a copy of FILE_NAME.
 	 * Otherwise there's a race between the caller and load(). */
@@ -51,6 +50,9 @@ process_create_initd (const char *file_name) {
 	if (fn_copy == NULL)
 		return TID_ERROR;
 	strlcpy (fn_copy, file_name, PGSIZE);
+	printf("fn_copy: %s\n", fn_copy); 
+
+	char *process_name = strtok_r(file_name, " ", &saveptr);
 
 	/* Create a new thread to execute FILE_NAME. */
 	tid = thread_create (process_name, PRI_DEFAULT, initd, fn_copy);
@@ -178,9 +180,13 @@ int process_exec(void *f_name) {
     char *parse[14];  // 파싱한 인자들을 저장할 배열
     int index = 0;
 
+	printf("File name before parsing: %s\n", file_name);
     token = strtok_r(file_name, " ", &saveptr);
+	printf("Tokenized argument 0: %p\n", &token);
     while (token != NULL && index < 14) {
-        parse[index++] = token;
+        parse[index] = token;
+		printf("Tokenized argument %d: %s\n", index, parse[index]);
+		index++;
         token = strtok_r(NULL, " ", &saveptr);
     }
 
@@ -191,7 +197,8 @@ int process_exec(void *f_name) {
     }
 
     argument_stack(parse, index, &_if.rsp);  // 인자를 스택에 적재
-    hex_dump(_if.rsp, _if.rsp, KERN_BASE - _if.rsp, true);
+    hex_dump(_if.rsp, _if.rsp, USER_STACK -_if.rsp, true); // user stack을 16진수로 프린트
+
 
     palloc_free_page(file_name);
     if (!success) {
@@ -202,12 +209,13 @@ int process_exec(void *f_name) {
     NOT_REACHED();
 }
 
-void argument_stack(char **parse, int count, void **rsp) {
+void 
+argument_stack(char **parse, int count, void **rsp) {
     uintptr_t argv_addr[14];  // 각 인자의 주소를 저장할 배열
     int len;
 
     // 1. 프로그램 이름 및 인자(문자열) 스택에 push
-    for (int i = count - 1; i >= 0; i--) {
+    for (int i = count-1; i >= 0; i--) {
         len = strlen(parse[i]) + 1;  // 널 문자 포함 길이
         *rsp -= len;  // 스택 포인터 이동
 
@@ -261,6 +269,9 @@ process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
+	for (int i = 0; i < 100000000; i++)
+    {
+    }
 	return -1;
 }
 
