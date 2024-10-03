@@ -48,8 +48,11 @@ void
 syscall_handler (struct intr_frame *f UNUSED) {
 	// TODO: Your implementation goes here.
 	uint64_t *sp = f->rsp;
-	check_address((void *)sp);
+	printf("rsp: %p\n", sp);
+	check_address(sp);
 	int syscall_number = *sp;
+	printf("System call number: %d\n", syscall_number);
+
 
 	printf ("system call!\n");
 	switch(syscall_number){
@@ -60,8 +63,14 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		// case SYS_WAIT : wait(); /* Wait for a child process to die. */
 		case SYS_CREATE : {
 			const char *filename = (const char *)f->R.rdi;
+			check_address(filename);  // 파일 이름 유효성 검사
+			printf("Filename: %s\n", filename);
+
 			unsigned initial_size = (unsigned)f->R.rsi;
 			f->R.rax = create(filename, initial_size);
+			bool result = create(filename, initial_size);
+			printf("Create result: %d\n", result);
+
 		}; /* Create a file. */
 		case SYS_REMOVE : {
 			char *filename = f->R.rdi;
@@ -74,7 +83,10 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		// case SYS_SEEK : seek(); /* Change position in a file. */
 		// case SYS_TELL : tell(); /* Report current position in a file. */
 		// case SYS_CLOSE : close(); /* Close a file. */
-		// default : printf("이상한거 나옴");
+		default : {
+			printf("Invaild system call number. \n");
+			exit(-1);
+		}
 	}
 	thread_exit ();
 }
@@ -82,16 +94,15 @@ syscall_handler (struct intr_frame *f UNUSED) {
 void
 check_address(void *addr){
 
-	if(addr == NULL){
-		exit(-1);
-	}
-	if(!is_user_vaddr(addr)){
-		exit(-1);
-	}
+if (addr == NULL || !is_kernel_vaddr(addr)) {
+	 printf("Invalid address: %p\n", addr);
+    exit(-1);
+}
 }
 
 void 
 halt(void){
+	printf("Halt called, shutting down...\n");
 	power_off();
 }
 
