@@ -261,24 +261,47 @@ palloc_init (void) {
    FLAGS, in which case the kernel panics. */
 void *
 palloc_get_multiple (enum palloc_flags flags, size_t page_cnt) {
-	struct pool *pool = flags & PAL_USER ? &user_pool : &kernel_pool;
+	/* 연속적인 가용 페이지를 얻고, PAGE_CNT의 그룹을 반환
+			* flags = PAL_USER
+				: 사용자 공간에서 페이지 가져오기
+					* PAL_USER가 설정되지 않으면 커널 공간에서 페이지 가져오기
+			* flags = PAL_ZERO
+				: 페이지를 0으로 채우기
+			* flags = PAL_ASSERT
+				: 사용 가능한 페이지가 너무 적으면 kernel panics 발생
+					* PAL ASSERT가 설정되지 않은 경우에는 null pointer 반환
+	*/
 
-	lock_acquire (&pool->lock);
-	size_t page_idx = bitmap_scan_and_flip (pool->used_map, 0, page_cnt, false);
-	lock_release (&pool->lock);
+	struct pool *pool = flags & PAL_USER ? &user_pool : &kernel_pool;										/* flags에 따라 사용자 공간을 사용할지, 커널 공간을 사용할지 결정. *flag가 0이면 커널 공간 사용 */
+
+	/* interrupt disable 처리를 해줘야 할까? 에 대한 chatgpt의 답변
+			* 커널 스레드가 동작하는 critical section에서는 interrupt disable을 하여 다른 스레드나 interrupt handler가 자원에 접근하지 않도록 막을 필요가 있다.
+				* 문제가 발생할 수 있는 상황
+					* 커널 스레드 A가 lock_acquire()로 락을 획득하려고 하는 중에, 인터럽트가 발생하고 그 인터럽트가 다른 커널 스레드 B를 실행 시킨다. 
+					* 만약 스레드 B가 동일한 락을 요청하려고 하면, 스레드 A와 B 사이에 교착 상태가 발생할 수 있다.
+				* chatgpt의 첨언: lock_aqcuire에서 ASSERT문으로 인터럽트 맥락이 아닌지 확인하고 있다면 추가로 interrupt disable 처리를 하지 않아도 될 듯 (동시성 문제는 발생하지 않음)
+			* 사용자 스레드에서 lock_acquire를 사용하는 경우, 일반적으로 interrupt를 수동으로 비활성화하지 않아도 된다. 내부적으로 스핀락이나 세마포어 같은 동기화 기법을 사용할 수 있다.
+				* 지인의 첨언: lock_acuire에서 sema_init을 사용하고 있으므로 사용자 스레드에서는 lock 전에 interrupt disable 처리할 필요 없을 듯!!
+	 */
+	lock_acquire (&pool->lock);																													/* 해당 풀 구조체 접근에 대한 lock 사용 */
+	size_t page_idx = bitmap_scan_and_flip (pool->used_map, 0, page_cnt, false);				/* 풀에서 사용 가능한 페이지를 조사하고 page_idx를 구함 */
+	lock_release (&pool->lock);																													/* 해당 풀 구조체 접근에 대한 lock 반환 */
 	void *pages;
 
 	if (page_idx != BITMAP_ERROR)
-		pages = pool->base + PGSIZE * page_idx;
+		pages = pool->base + PGSIZE * page_idx;																						/* pool의 base부터 필요한 page_cnt만큼 더한 결과 나온 주소 */
 	else
-		pages = NULL;
+		pages = NULL;																																			/* 페이지가 부족하면 null pointer 반환 *flag가 0이면 NULL 포인터 반환 */
 
 	if (pages) {
+		/* 예외 처리: pages가 NULL일 경우에는 memset을 하지 않음 */
 		if (flags & PAL_ZERO)
-			memset (pages, 0, PGSIZE * page_cnt);
-	} else {
+			memset (pages, 0, PGSIZE * page_cnt);																						/* PAL_ZERO가 설정되어 있을 경우 페이지를 0으로 채움 */
+	} 
+	else {
+		/* PAL_ASSERT가 설정된 경우 NULL 포인터 대신 커널 패닉을 발생시킴 */
 		if (flags & PAL_ASSERT)
-			PANIC ("palloc_get: out of pages");
+			PANIC ("palloc_get: out of pages");																							/* PAL_ASSERT가 설정되어 있을 경우: 페이지가 부족하면 커널 패닉 발생시킴 */
 	}
 
 	return pages;
@@ -293,7 +316,7 @@ palloc_get_multiple (enum palloc_flags flags, size_t page_cnt) {
    FLAGS, in which case the kernel panics. */
 void *
 palloc_get_page (enum palloc_flags flags) {
-	return palloc_get_multiple (flags, 1);
+	return palloc_get_multiple (flags, 1);																							/* 하나의 페이지만 할당받음 */
 }
 
 /* Frees the PAGE_CNT pages starting at PAGES. */

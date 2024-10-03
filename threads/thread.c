@@ -490,7 +490,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 	memset (t, 0, sizeof *t);
 	t->status = THREAD_BLOCKED;
 	strlcpy (t->name, name, sizeof t->name);
-	t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *);
+	t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *);						/* 스레드 구조체의 바닥 주소 + 4KiB - 8바이트 */
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
 
@@ -510,7 +510,6 @@ init_thread (struct thread *t, const char *name, int priority) {
    will be in the run queue.)  If the run queue is empty, return
    idle_thread. */
 static struct thread *
-
 next_thread_to_run (void) {
 	if (list_empty (&ready_list))
 		return idle_thread;

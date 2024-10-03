@@ -27,9 +27,10 @@ static bool load (const char *file_name, struct intr_frame *if_);
 static void initd (void *f_name);
 static void __do_fork (void *);
 
-/* General process initializer for initd and other process. */
+/*   General process initializer for initd and other process. */
 static void
 process_init (void) {
+	// 특정 프로세스에 대한 개별적인 초기화보다, 전체 프로세스 설정에 관한 부분에서 이용함
 	struct thread *current = thread_current ();
 }
 
@@ -40,36 +41,95 @@ process_init (void) {
  * Notice that THIS SHOULD BE CALLED ONCE. */
 tid_t
 process_create_initd (const char *file_name) {
+	// 첫 번째 사용자 프로세스 initd 생성
 	char *fn_copy;
 	tid_t tid;
-	char *saveptr;
-	char *process_name = strtok_r(file_name, " ", &saveptr);
+	/* 새로 추가한 코드 */
+	char *saveptr;																																/* strtok_r에서, 찾아낸 토큰 다음 위치를 저장하고 있을 정적 변수, 멀티 스레드 환경에 유리함 */
 
 	/* Make a copy of FILE_NAME.
 	 * Otherwise there's a race between the caller and load(). */
-	fn_copy = palloc_get_page (0);
+	/* 매개변수로 들어온 file_name에 바로 접근하면 load() 함수와 경쟁 상태가 발생할 수 있기 때문에
+		 커널 가상 공간에서 한 개의 페이지를 할당받아서 그곳에 file_name을 복사시켜 놓고 그 메모리를 사용함
+	 */
+	fn_copy = palloc_get_page (0);																								/* file_name을 저장할 하나의 페이지를 할당 받음 (아무 flag도 사용하지 않음 -> 커널 공간을 할당받음) */
 	if (fn_copy == NULL)
 		return TID_ERROR;
-	strlcpy (fn_copy, file_name, PGSIZE);
+	strlcpy (fn_copy, file_name, PGSIZE);	// PGSIZE = 2^12 = 4KiB
+	char *process_name = strtok_r(file_name, " ", &saveptr);											/* 명령어로 들어온 file_name에서 첫 번째 토큰을 파싱하여 프로세스 이름을 구함 */
+	/**/
 
 	/* Create a new thread to execute FILE_NAME. */
-	tid = thread_create (process_name, PRI_DEFAULT, initd, fn_copy);
+	tid = thread_create (process_name, PRI_DEFAULT, initd, fn_copy);							/* 명령어로 들어온 프로세스 이름으로 스레드를 생성 */
+	/*-------------------------------------
+	 * thread_create의 내용
+	 --------------------------------------
+		ASSERT (function != NULL);
+
+		t = palloc_get_page (PAL_ZERO);																							// 스레드를 위한 하나의 페이지를 할당 받음
+		if (t == NULL)
+			return TID_ERROR;
+
+		init_thread (t, name, priority);
+			//------------------------------------------------
+			init_thread의 내용
+			-------------------------------------------------
+				ASSERT (t != NULL);
+				ASSERT (PRI_MIN <= priority && priority <= PRI_MAX);
+				ASSERT (name != NULL);
+
+				memset (t, 0, sizeof *t);
+				t->status = THREAD_BLOCKED;																							// init_thread 시 스레드 초기 상태는 BLOCKED로 설정됨
+				strlcpy (t->name, name, sizeof t->name);
+				t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *);										// 이름 설정
+				t->priority = priority;																									// 우선순위 설정
+				t->magic = THREAD_MAGIC;																								// magic number 설정
+
+				t->wait_on_lock = NULL;																									// wait_on_lock은 NULL로 설정
+				t->init_priority = priority;																						// 초기 우선순위 설정
+
+				list_init(&t->donations);																								// 나에게 우선순위를 기부해준 스레드의 목록은 빈 배열로 설정
+			-------------------------------------------------//
+
+		tid = t->tid = allocate_tid ();																							// tid 설정
+
+		// 스레드의 interrupt_frame 정보 설정 (초기에는 커널의 주소를 가리키고 있음)
+		t->tf.rip = (uintptr_t) kernel_thread;																			// rip에 kernel_thread라는 함수의 주소를 설정
+		t->tf.R.rdi = (uint64_t) function;																					// rdi(첫 번째 인자)에 function 함수의 포인터를 설정
+		t->tf.R.rsi = (uint64_t) aux;																								// rsi(function에 전달할 추가 인자, 함수의 두 번째 인자)
+		t->tf.ds = SEL_KDSEG;																												// ds (data segment) 레지스터 설정. 스레드가 커널 모드에서 데이터에 접근할 때 사용할 데이터 세그먼트를 지정
+		t->tf.es = SEL_KDSEG;																												// es 레지스터도 커널 데이터 세그먼트를 가리키도록 설정함.
+		t->tf.ss = SEL_KDSEG;																												// ss (stack segment) 레지스터 설정. 스택 세그먼트가 커널 모드로 설정되어, 스레드가 스택에 접근할 수 있도록 함
+		t->tf.cs = SEL_KCSEG;																												// cs (code segment) 레지스터 설정. 이로써 커널 모드에서 코드가 안전하게 실행 가능.
+		t->tf.eflags = FLAG_IF;																											// 스레드가 실행될 때 인터럽트를 허용하는지 여부
+
+		thread_unblock (t);																													// 스레드를 BLOCKED 상태에서 READY 상태로 변경
+
+		if (check_priority_threads())
+		{
+			thread_yield();																														// 지금 생성한 스레드가 현재 실행 중인 스레드보다 우선순위가 높다면 스케줄링을 진행
+		}
+
+		return tid; 
+	*/
+
 	if (tid == TID_ERROR)
-		palloc_free_page (fn_copy);
+		palloc_free_page (fn_copy);																									/* 스레드 실행에 실패했다면 파일 이름을 복사해놨던 페이지를 반환함 */
 	return tid;
 }
 
 /* A thread function that launches first user process. */
 static void
 initd (void *f_name) {
+/* 첫 번째 사용자 프로세스가 실행되는 스레드 함수 (파라미터 f_name은 프로세스 이름 + argv[]이다.) */
 #ifdef VM
 	supplemental_page_table_init (&thread_current ()->spt);
 #endif
 
-	process_init ();
+	process_init ();																															/* 현재 running 중인 스레드의 유효성 검사 */
 
-	if (process_exec (f_name) < 0)
-		PANIC("Fail to launch initd\n");
+	if (process_exec (f_name) < 0)																								/* f_name을 가지고 process 실행시킴 */
+		PANIC("Fail to launch initd\n");																						/* 프로세스 실행 실패 시 커널 패닉을 발생시킴 */
 	NOT_REACHED ();
 }
 
@@ -173,6 +233,7 @@ int process_exec(void *f_name) {
 
     process_cleanup();
 
+		/* 새로 추가한 코드 */
     char *saveptr;
     char *token;
     char *parse[14];  // 파싱한 인자들을 저장할 배열

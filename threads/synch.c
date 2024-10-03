@@ -45,6 +45,11 @@
    thread, if any). */
 void
 sema_init (struct semaphore *sema, unsigned value) {
+   /* sema_init을 할 때는 interrupt disable()을 하지 않아줘도 돼? 에 대한 chatgpt의 답변
+      : 안 해줘도 된다. 세마포어의 초기화는 데이터 구조를 설정하는 작업이지, 실질적으로 동기화 작업이 수행되는 시점이 아니다.
+         * 1. 데이터 설정 작업. 스레드 간 자원 경쟁이나 동기화가 필요한 상황이 아니다.
+         * 2. 공유 자원에 접근하지 않는다.
+   */
 	ASSERT (sema != NULL);
 
 	sema->value = value;

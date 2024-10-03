@@ -42,6 +42,23 @@ void
 syscall_handler (struct intr_frame *f UNUSED) {
 	// TODO: Your implementation goes here.
 	printf ("system call!\n");
+
+	uint64_t *sp = f->rsp; /* 유저 스택 포인터 */
+ 	check_address((void *)sp);
+ 	int syscall_number = *sp;   /* 시스템 콜 넘버 */
+
+	switch (syscall_number) {
+		
+	}
+
+
+
 	thread_exit ();
 }
 
+void check_address(void *addr) {
+ /* 주소 값이 유저 영역에서 사용하는 주소값인지 확인하는함수
+Pintos에서는 시스템 콜이 접근할 수 있는 주소를 0x8048000~0xc0000000으로제한함
+유저 영역을벗어난영역일경우프로세스종료(exit(-1)) */
+
+}
