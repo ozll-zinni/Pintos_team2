@@ -56,11 +56,15 @@ syscall_handler (struct intr_frame *f UNUSED) {
 
 	printf ("system call!\n");
 	switch(syscall_number){
-		case SYS_HALT :	halt(); /* Halt the operating system. */
-		case SYS_EXIT : exit(f->R.rdi); /* Terminate this process. */
+		case SYS_HALT :	
+			halt(); /* Halt the operating system. */
+		case SYS_EXIT : 
+			exit(f->R.rdi); /* Terminate this process. */
 		// case SYS_FORK : fork(); /* Clone current process. */
-		// case SYS_EXEC : exec(); /* Switch current process. */
-		// case SYS_WAIT : wait(); /* Wait for a child process to die. */
+		case SYS_EXEC : 
+			exec(f->R.rdi); /* Switch current process. */
+		case SYS_WAIT : 
+			wait(f->R.rdi); /* Wait for a child process to die. */
 		case SYS_CREATE : {
 			const char *filename = (const char *)f->R.rdi;
 			check_address(filename);  // 파일 이름 유효성 검사
@@ -77,10 +81,13 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			remove(filename);
 		} /* Delete a file. */
 		// case SYS_OPEN : open();  /* Open a file. */
-		// case SYS_FILESIZE : filesize(); /* Obtain a file's size. */
-		// case SYS_READ : read(); /* Read from a file. */
+		case SYS_FILESIZE : 
+			filesize(f->R.rdi); /* Obtain a file's size. */
+		case SYS_READ : 
+			read(f->R.rdi); /* Read from a file. */
 		// case SYS_WRITE : write();  /* Write to a file. */
-		// case SYS_SEEK : seek(); /* Change position in a file. */
+		case SYS_SEEK : 
+			seek(f->R.rdi); /* Change position in a file. */
 		// case SYS_TELL : tell(); /* Report current position in a file. */
 		// case SYS_CLOSE : close(); /* Close a file. */
 		default : {
@@ -109,9 +116,11 @@ halt(void){
 void
 exit(int status){
 	struct thread *curr = thread_current();
-	printf("%s:exit(%d)", curr->name, status);
-	thread_exit();
+	curr->exit_status = status;
+	printf("%s: exit%d\n", curr->name, status);
+	thread_exit(); // 정상적으로 종료되었으면 0
 }
+
 
 bool
 create(const char *filename, unsigned initial_size){

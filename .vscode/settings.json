@@ -82,6 +82,7 @@
     "flags.h": "c",
     "syscall.h": "c",
     "intr-stubs.h": "c",
-    "stddef.h": "c"
+    "stddef.h": "c",
+    "stdint.h": "c"
   }
 }

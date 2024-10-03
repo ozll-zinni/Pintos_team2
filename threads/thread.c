@@ -497,6 +497,8 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->wait_on_lock = NULL;
 	t->init_priority = priority;
 
+	t->exit_status = 0; //해당 구조체 멤버값을 인자로 받은 status을 넣어준 뒤 thread_exit()을 실행한다
+
 	// t->donation_elem.prev = list_head;
 	// t->donation_elem.next = list_tail;
 
