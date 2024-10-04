@@ -17,7 +17,7 @@
    protect kernel threads from one another, not from interrupt
    handlers. */
 
-/* Queue buffer size, in bytes. */
+/* Queue , in bytes. */
 #define INTQ_BUFSIZE 64
 
 /* A circular queue of bytes. */

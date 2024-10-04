@@ -22,6 +22,12 @@ bool create(const char *file, unsigned initial_size);
 bool remove(const char *filename);
 int open(const char *filename);
 int read (int fd, void *buffer, unsigned size);
+int filesize(int fd);
+int write (int fd, void *buffer, unsigned size);
+void seek(int fd, unsigned position);
+unsigned tell(int fd);
+void close(int fd);
+struct lock file_lock;
 /* System call.
  *
  * Previously system call services was handled by the interrupt handler
@@ -73,21 +79,18 @@ syscall_handler (struct intr_frame *f UNUSED) {
 
 			unsigned initial_size = (unsigned)f->R.rsi;
 			f->R.rax = create(filename, initial_size);
-			bool result = create(filename, initial_size);
-			printf("Create result: %d\n", result);
-
 		}; /* Create a file. */
 		case SYS_REMOVE : {
 			char *filename = f->R.rdi;
 			remove(filename);
 		} /* Delete a file. */
 		case SYS_OPEN : open(f->R.rdi);  /* Open a file. */
-		// case SYS_FILESIZE : filesize(); /* Obtain a file's size. */
-		// case SYS_READ : read(); /* Read from a file. */
-		// case SYS_WRITE : write();  /* Write to a file. */
-		// case SYS_SEEK : seek(); /* Change position in a file. */
-		// case SYS_TELL : tell(); /* Report current position in a file. */
-		// case SYS_CLOSE : close(); /* Close a file. */
+		case SYS_FILESIZE : filesize(f->R.rdi); /* Obtain a file's size. */
+		case SYS_READ : read(f->R.rdi, f->R.rsi, f->R.rdx); /* Read from a file. */
+		case SYS_WRITE : write(f->R.rdi, f->R.rsi, f->R.rdx);  /* Write to a file. */
+		case SYS_SEEK : seek(f->R.rdi, f->R.rsi); /* Change position in a file. */
+		case SYS_TELL : tell(f->R.rdi); /* Report current position in a file. */
+		case SYS_CLOSE : close(f->R.rdi); /* Close a file. */
 		default : {
 			printf("Invaild system call number. \n");
 			exit(-1);
@@ -186,6 +189,10 @@ int read (int fd, void *buffer, unsigned size)
 		return -1;
 	}
 
+	if(file_bytes < 0){
+		return -1;
+	}
+
 	if (fd == 0) {
 		for(unsigned i = 0; i < size; i++)
 		{
@@ -197,6 +204,8 @@ int read (int fd, void *buffer, unsigned size)
 		lock_acquire(&file_lock);
 		file_bytes = (int)file_read(file, buffer, size);
 		lock_release(&file_lock);
+	} else if (fd == 1){
+		return -1;
 	}
 	//todo fd = 1인경우?
 	return file_bytes;
@@ -209,3 +218,58 @@ int read (int fd, void *buffer, unsigned size)
  /* 파일 디스크립터가 0이 아닐 경우 파일의 데이터를 크기만큼 저
 장 후 읽은 바이트 수를 리턴 */
  }
+
+ int 
+ filesize(int fd){
+	struct file *curr = process_get_file(fd);
+	return file_length(curr);
+ }
+
+int
+write (int fd, void *buffer, unsigned size){
+ {
+	struct thread *curr = thread_current();
+	struct file *file = curr->fd_table[fd];
+	int file_bytes;
+	if(fd < 0 || fd >= MAX_FD){
+		return -1;
+	}
+
+	if(file_bytes < 0){
+		return -1;
+	}
+
+	if (fd == 0) {
+		return -1;
+	} else if (fd == 1){
+		for(unsigned i = 0; i < size; i++)
+	{
+		putbuf(&buffer, (size_t)size);
+	}	
+	file_bytes = size;
+	} else if(fd >= 2){
+		lock_acquire(&file_lock);
+		file_bytes = (int)file_write(file, buffer, size);
+		lock_release(&file_lock);
+	} 
+	return file_bytes;
+}
+}
+
+void 
+seek(int fd, unsigned position){
+	struct file *file = process_get_file(fd);
+	file_seek(&file, position);
+}
+
+unsigned 
+tell (int fd){
+	struct file *file = process_get_file(fd);
+	file_tell(&file);
+}
+
+void
+close(int fd){
+	struct file *file = process_get_file(fd);
+	file_close(&file);
+}
