@@ -111,7 +111,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	}
 	thread_exit ();
 }
-}
+
 
 void
 check_address(void *addr){

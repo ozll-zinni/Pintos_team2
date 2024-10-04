@@ -203,16 +203,16 @@ __do_fork (void *aux) {
 	// FDT 복제
 	for (int i = 0; i < FDT_COUNT_LIMIT; i++)
 	{
-		struct file *file = parent->fdt[i];
+		struct file *file = parent->fd_table[i];
 		if (file == NULL)
 			continue;
 		if (file > 2)
 			file = file_duplicate(file);
-		current->fdt[i] = file;
+		current->fd_table[i] = file;
 	}
 
 	//next_fd도 복제
-	current->next_fd = parent->next_fd;
+	current->fd = parent->fd;
 
 	// 로드가 완료될 때까지 기다리고 있던 부모 대기 해제
 	sema_up(&current->load_sema);
@@ -389,7 +389,7 @@ void process_exit(void)
     // 1) FDT의 모든 파일을 닫고 메모리를 반환한다.
     for (int i = 2; i < FDT_COUNT_LIMIT; i++)
         close(i);
-    palloc_free_page(curr->fdt);
+    palloc_free_page(curr->fd_table);
     file_close(curr->running); // 2) 현재 실행 중인 파일도 닫는다.
     process_cleanup();
     // 3) 자식이 종료될 때까지 대기하고 있는 부모에게 signal을 보낸다.
