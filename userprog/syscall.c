@@ -18,6 +18,9 @@ void check_address(void *addr);
 void get_argument(void *rsp, int *arg, int count);
 void halt(void);
 void exit(int status);
+int exec(char *cmd_line);
+int fork(const char * thread_name, struct intr_frame *f);
+int wait(int pid);
 bool create(const char *file, unsigned initial_size);
 bool remove(const char *filename);
 int open(const char *filename);
@@ -67,11 +70,20 @@ syscall_handler (struct intr_frame *f UNUSED) {
 
 	printf ("system call!\n");
 	switch(syscall_number){
-		case SYS_HALT :	halt(); /* Halt the operating system. */
-		case SYS_EXIT : exit(f->R.rdi); /* Terminate this process. */
-		// case SYS_FORK : fork(); /* Clone current process. */
-		// case SYS_EXEC : exec(); /* Switch current process. */
-		// case SYS_WAIT : wait(); /* Wait for a child process to die. */
+		case SYS_HALT :	
+			halt(); /* Halt the operating system. */
+		case SYS_EXIT : 
+			exit(f->R.rdi); /* Terminate this process. */
+			break;
+		case SYS_FORK : /* Clone current process. */
+			f->R.rax = fork(f->R.rdi, f);
+			break;
+		case SYS_EXEC : 
+			f->R.rax = exec(f->R.rdi); /* Switch current process. */
+			break;
+		case SYS_WAIT : 
+			f->R.rax = wait(f->R.rdi); /* Wait for a child process to die. */
+			break;
 		case SYS_CREATE : {
 			const char *filename = (const char *)f->R.rdi;
 			check_address(filename);  // 파일 이름 유효성 검사
@@ -91,12 +103,14 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		case SYS_SEEK : seek(f->R.rdi, f->R.rsi); /* Change position in a file. */
 		case SYS_TELL : tell(f->R.rdi); /* Report current position in a file. */
 		case SYS_CLOSE : close(f->R.rdi); /* Close a file. */
+
 		default : {
 			printf("Invaild system call number. \n");
 			exit(-1);
 		}
 	}
 	thread_exit ();
+}
 }
 
 void
@@ -116,10 +130,38 @@ halt(void){
 
 void
 exit(int status){
-    struct thread *curr = thread_current();
-    curr->exit_status = status;
-    thread_exit(); // 정상적으로 종료되었으면 0
+	struct thread *curr = thread_current();
+	curr->exit_status = status;
+	printf("%s: exit%d\n", curr->name, status);
+	thread_exit(); // 정상적으로 종료되었으면 0
 }
+
+int exec(char *cmd_line){
+	// cmd_line이 유효한 사용자 주소인지 확인 -> 잘못된 주소인 경우 종료/예외 발생
+	check_address(cmd_line);
+
+	// process.c 파일의 process_create_initd 함수와 유사하다.
+	// 단, 스레드를 새로 생성하는 건 fork에서 수행하므로
+	// exec는 이미 존재하는 프로세스의 컨텍스트를 교체하는 작업을 하므로
+	// 현재 프로세스의 주소 공간을 교체하여 새로운 프로그램을 실행
+	// 이 함수에서는 새 스레드를 생성하지 않고 process_exec을 호출한다.
+
+	
+	// process_exec 함수 안에서 filename을 변경해야 하므로
+	// 커널 메모리 공간에 cmd_line의 복사본을 만든다.
+	// (현재는 const char* 형식이기 때문에 수정할 수 없다.)
+	char *cmd_line_copy;
+	cmd_line_copy = palloc_get_page(0);
+	if (cmd_line_copy == NULL)
+		exit(-1);							  // 메모리 할당 실패 시 status -1로 종료한다.
+	strlcpy(cmd_line_copy, cmd_line, PGSIZE); // cmd_line을 복사한다.
+
+
+	// 스레드의 이름을 변경하지 않고 바로 실행한다.
+	if (process_exec(cmd_line_copy) == -1)
+		exit(-1); // 실패 시 status -1로 종료한다.
+}
+
 
 bool
 create(const char *filename, unsigned initial_size){
@@ -159,26 +201,26 @@ int open(const char *filename)
     return fd;  // 성공적으로 파일을 열었으면 fd 반환
 }
 
-int exec(char *cmd_line){
-    // cmd_line이 유효한 사용자 주소인지 확인 -> 잘못된 주소인 경우 종료/예외 발생
-    check_address(cmd_line);
-    // process.c 파일의 process_create_initd 함수와 유사하다.
-    // 단, 스레드를 새로 생성하는 건 fork에서 수행하므로
-    // exec는 이미 존재하는 프로세스의 컨텍스트를 교체하는 작업을 하므로
-    // 현재 프로세스의 주소 공간을 교체하여 새로운 프로그램을 실행
-    // 이 함수에서는 새 스레드를 생성하지 않고 process_exec을 호출한다.
-    // process_exec 함수 안에서 filename을 변경해야 하므로
-    // 커널 메모리 공간에 cmd_line의 복사본을 만든다.
-    // (현재는 const char* 형식이기 때문에 수정할 수 없다.)
-    char *cmd_line_copy;
-    cmd_line_copy = palloc_get_page(0);
-    if (cmd_line_copy == NULL)
-        exit(-1);                             // 메모리 할당 실패 시 status -1로 종료한다.
-    strlcpy(cmd_line_copy, cmd_line, PGSIZE); // cmd_line을 복사한다.
-    // 스레드의 이름을 변경하지 않고 바로 실행한다.
-    if (process_exec(cmd_line_copy) == -1)
-        exit(-1); // 실패 시 status -1로 종료한다.
-}
+// int exec(char *cmd_line){
+//     // cmd_line이 유효한 사용자 주소인지 확인 -> 잘못된 주소인 경우 종료/예외 발생
+//     check_address(cmd_line);
+//     // process.c 파일의 process_create_initd 함수와 유사하다.
+//     // 단, 스레드를 새로 생성하는 건 fork에서 수행하므로
+//     // exec는 이미 존재하는 프로세스의 컨텍스트를 교체하는 작업을 하므로
+//     // 현재 프로세스의 주소 공간을 교체하여 새로운 프로그램을 실행
+//     // 이 함수에서는 새 스레드를 생성하지 않고 process_exec을 호출한다.
+//     // process_exec 함수 안에서 filename을 변경해야 하므로
+//     // 커널 메모리 공간에 cmd_line의 복사본을 만든다.
+//     // (현재는 const char* 형식이기 때문에 수정할 수 없다.)
+//     char *cmd_line_copy;
+//     cmd_line_copy = palloc_get_page(0);
+//     if (cmd_line_copy == NULL)
+//         exit(-1);                             // 메모리 할당 실패 시 status -1로 종료한다.
+//     strlcpy(cmd_line_copy, cmd_line, PGSIZE); // cmd_line을 복사한다.
+//     // 스레드의 이름을 변경하지 않고 바로 실행한다.
+//     if (process_exec(cmd_line_copy) == -1)
+//         exit(-1); // 실패 시 status -1로 종료한다.
+// }
 
 int read (int fd, void *buffer, unsigned size)
  {
@@ -272,4 +314,14 @@ void
 close(int fd){
 	struct file *file = process_get_file(fd);
 	file_close(&file);
+}
+
+int fork(const char * thread_name, struct intr_frame *f)
+{
+	return process_fork(thread_name, f);
+}
+
+int wait(int pid)
+{
+	return process_wait(pid);
 }
