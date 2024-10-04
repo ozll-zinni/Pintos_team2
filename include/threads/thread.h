@@ -108,8 +108,12 @@ struct thread {
 	struct list_elem donation_elem;
 
 	int fd;
-	struct file *fd_table[MAX_FD];	
+	struct file **fd_table;	
 	int exit_status; //스레드 구조체 수정 -> _exit(), _wait()에 사용
+	int stdin_count;
+	int stdout_count;
+
+
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */

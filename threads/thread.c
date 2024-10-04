@@ -12,7 +12,6 @@
 #include "threads/vaddr.h"
 #include "intrinsic.h"
 #ifdef USERPROG
-#include "userprog/syscall.h"
 #include "userprog/process.h"
 #endif
 
@@ -113,7 +112,6 @@ thread_init (void) {
 
 	/* Init the global thread context */
 	lock_init (&tid_lock);
-	lock_init (&file_lock);
 	list_init (&ready_list);
 	list_init (&destruction_req);
 	list_init (&wait_list);
@@ -200,6 +198,21 @@ thread_create (const char *name, int priority,
 	init_thread (t, name, priority);
 	tid = t->tid = allocate_tid ();
 
+	struct thread *parent;
+	parent = thread_current();
+	list_push_back(&parent->child_list, &t->child_elem);
+
+	t->fd_table = palloc_get_multiple(PAL_ZERO, FDT_PAGES);
+	if(t->fd_table == NULL)
+		return TID_ERROR;
+
+	t->fd_table[0] = 1;
+	t->fd_table[1] = 2;
+	t->fd = 2;
+	t->stdin_count = 1;
+	t->stdout_count = 1;
+
+
 	/* Call the kernel_thread if it scheduled.
 	 * Note) rdi is 1st argument, and rsi is 2nd argument. */
 	t->tf.rip = (uintptr_t) kernel_thread;
@@ -211,27 +224,37 @@ thread_create (const char *name, int priority,
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
 
-    // 파일 디스크립터 테이블 초기화
-    for (int i = 0; i < MAX_FD; i++) {
-        t->fd_table[i] = NULL;  // 모든 파일 엔트리를 초기화
-    }
-    t->fd = 2;  // 0과 1은 stdin, stdout을 위해 예약
-
 	/* Add to run queue. */
 	thread_unblock (t);
+
 	list_push_back(&thread_current()->child_list, &t->child_elem);
 
-	if (check_priority_threads())
-	{
+	if (priority > thread_get_priority()){
 		thread_yield();
 	}
 	return tid;
 }
 
-void test_max_priority(void){
-	if(!list_empty(&ready_list) && (list_front(&ready_list), &thread_current()->elem, NULL)) {
-		thread_yield();
-	}
+void test_max_priority(void) {
+    if (list_empty(&ready_list)) {
+        return;
+    }
+    
+    struct thread *t;
+    struct list_elem* max = list_begin(&ready_list);
+    t = list_entry(max, struct thread, elem);
+
+    // 현재 스레드의 우선순위와 비교
+    if (t->priority > thread_get_priority()) {
+        // 인터럽트 컨텍스트인지 확인
+        if (intr_context()) {
+            // 인터럽트 중이라면, 인터럽트 후 양보가 이루어지도록 설정
+            intr_yield_on_return();
+        } else {
+            // 그렇지 않으면 즉시 양보
+            thread_yield();
+        }
+    }
 }
 
 /* list_insert_ordered에서 쓸 함수 정의 */
@@ -384,6 +407,7 @@ struct list* thread_get_wait_list(void) {			/* wait list의 주소 반환 */
 	return &wait_list;
 }
 
+
 bool check_priority_threads() {
     if (!list_empty(&ready_list)) {
         if (thread_current()->priority < list_entry(list_front(&ready_list), struct thread, elem)->priority) {
@@ -401,9 +425,7 @@ thread_set_priority (int new_priority) {
 	thread_current() -> init_priority = new_priority;
 
 	refresh_priority();
-	if (check_priority_threads()){
-		thread_yield();
-	}
+	test_max_priority();
 }
 
 /* Returns the current thread's priority. */
