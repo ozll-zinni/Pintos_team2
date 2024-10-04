@@ -1,0 +1,15 @@
+FAIL
+Test output failed to match any acceptable form.
+
+Acceptable output:
+  (exit) begin
+  exit: exit(57)
+Differences in `diff -u' format:
++ fn_copy: exit
++ f_name address: 0x8004242000, file_name address: 0x8004242000
++ File name before parsing: exit
++ 000000004747ffe0  00 00 00 00 00 00 00 00-fb ff 47 47 00 00 00 00 |..........GG....|
++ 000000004747fff0  00 00 00 00 00 00 00 00-00 00 00 65 78 69 74 00 |...........exit.|
+  (exit) begin
+- exit: exit(57)
++ exit: exit57

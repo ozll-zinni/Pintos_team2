@@ -1,0 +1,81 @@
+FAIL
+Test output failed to match any acceptable form.
+
+Acceptable output:
+  (args) begin
+  (args) argc = 23
+  (args) argv[0] = 'args-many'
+  (args) argv[1] = 'a'
+  (args) argv[2] = 'b'
+  (args) argv[3] = 'c'
+  (args) argv[4] = 'd'
+  (args) argv[5] = 'e'
+  (args) argv[6] = 'f'
+  (args) argv[7] = 'g'
+  (args) argv[8] = 'h'
+  (args) argv[9] = 'i'
+  (args) argv[10] = 'j'
+  (args) argv[11] = 'k'
+  (args) argv[12] = 'l'
+  (args) argv[13] = 'm'
+  (args) argv[14] = 'n'
+  (args) argv[15] = 'o'
+  (args) argv[16] = 'p'
+  (args) argv[17] = 'q'
+  (args) argv[18] = 'r'
+  (args) argv[19] = 's'
+  (args) argv[20] = 't'
+  (args) argv[21] = 'u'
+  (args) argv[22] = 'v'
+  (args) argv[23] = null
+  (args) end
+  args-many: exit(0)
+Differences in `diff -u' format:
++ fn_copy: args-many a b c d e f g h i j k l m n o p q r s t u v
++ f_name address: 0x8004242000, file_name address: 0x8004242000
++ File name before parsing: args-many a b c d e f g h i j k l m n o p q r s t u v
++ 000000004747ff00  00 00 00 00 00 00 00 00-ca ff 47 47 00 00 00 00 |..........GG....|
++ 000000004747ff10  d4 ff 47 47 00 00 00 00-d6 ff 47 47 00 00 00 00 |..GG......GG....|
++ 000000004747ff20  d8 ff 47 47 00 00 00 00-da ff 47 47 00 00 00 00 |..GG......GG....|
++ 000000004747ff30  dc ff 47 47 00 00 00 00-de ff 47 47 00 00 00 00 |..GG......GG....|
++ 000000004747ff40  e0 ff 47 47 00 00 00 00-e2 ff 47 47 00 00 00 00 |..GG......GG....|
++ 000000004747ff50  e4 ff 47 47 00 00 00 00-e6 ff 47 47 00 00 00 00 |..GG......GG....|
++ 000000004747ff60  e8 ff 47 47 00 00 00 00-ea ff 47 47 00 00 00 00 |..GG......GG....|
++ 000000004747ff70  ec ff 47 47 00 00 00 00-ee ff 47 47 00 00 00 00 |..GG......GG....|
++ 000000004747ff80  f0 ff 47 47 00 00 00 00-f2 ff 47 47 00 00 00 00 |..GG......GG....|
++ 000000004747ff90  f4 ff 47 47 00 00 00 00-f6 ff 47 47 00 00 00 00 |..GG......GG....|
++ 000000004747ffa0  f8 ff 47 47 00 00 00 00-fa ff 47 47 00 00 00 00 |..GG......GG....|
++ 000000004747ffb0  fc ff 47 47 00 00 00 00-fe ff 47 47 00 00 00 00 |..GG......GG....|
++ 000000004747ffc0  00 00 00 00 00 00 00 00-00 00 61 72 67 73 2d 6d |..........args-m|
++ 000000004747ffd0  61 6e 79 00 61 00 62 00-63 00 64 00 65 00 66 00 |any.a.b.c.d.e.f.|
++ 000000004747ffe0  67 00 68 00 69 00 6a 00-6b 00 6c 00 6d 00 6e 00 |g.h.i.j.k.l.m.n.|
++ 000000004747fff0  6f 00 70 00 71 00 72 00-73 00 74 00 75 00 76 00 |o.p.q.r.s.t.u.v.|
+  (args) begin
+  (args) argc = 23
+  (args) argv[0] = 'args-many'
+  (args) argv[1] = 'a'
+  (args) argv[2] = 'b'
+  (args) argv[3] = 'c'
+  (args) argv[4] = 'd'
+  (args) argv[5] = 'e'
+  (args) argv[6] = 'f'
+  (args) argv[7] = 'g'
+  (args) argv[8] = 'h'
+  (args) argv[9] = 'i'
+  (args) argv[10] = 'j'
+  (args) argv[11] = 'k'
+  (args) argv[12] = 'l'
+  (args) argv[13] = 'm'
+  (args) argv[14] = 'n'
+  (args) argv[15] = 'o'
+  (args) argv[16] = 'p'
+  (args) argv[17] = 'q'
+  (args) argv[18] = 'r'
+  (args) argv[19] = 's'
+  (args) argv[20] = 't'
+  (args) argv[21] = 'u'
+  (args) argv[22] = 'v'
+  (args) argv[23] = null
+  (args) end
+- args-many: exit(0)
++ args-many: exit0
