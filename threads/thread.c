@@ -211,12 +211,12 @@ thread_create (const char *name, int priority,
 
 	/* Add to run queue. */
 	thread_unblock (t);
+	list_push_back(&thread_current()->child_list, &t->child_elem);
 
 	if (check_priority_threads())
 	{
 		thread_yield();
 	}
-
 	return tid;
 }
 
@@ -494,13 +494,19 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
 
-	t->wait_on_lock = NULL;
 	t->init_priority = priority;
+	t->wait_on_lock = NULL;
+	list_init(&(t->donations));
+
+	t->exit_status = 0;//해당 구조체 멤버값을 인자로 받은 status을 넣어준 뒤 thread_exit()을 실행한다
+	t->next_fd = 2;
 
 	// t->donation_elem.prev = list_head;
 	// t->donation_elem.next = list_tail;
-
-	list_init(&t->donations);
+	sema_init(&t->load_sema, 0);
+	sema_init(&t->exit_sema, 0);
+	sema_init(&t->wait_sema, 0);
+	list_init(&(t->child_list));
 
 }
 

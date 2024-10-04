@@ -5,6 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 #include "threads/interrupt.h"
+#include "threads/synch.h"
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -27,6 +28,8 @@ typedef int tid_t;
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
 
+#define FDT_PAGES 2
+#define FDT_COUNT_LIMIT 128
 /* A kernel thread or user process.
  *
  * Each thread structure is stored in its own 4 kB page.  The
@@ -93,8 +96,8 @@ struct thread {
 	enum thread_status status;          /* Thread state. */
 	char name[16];                      /* Name (for debugging purposes). */
 	int priority;                       /* Priority. */
-	int64_t awake_ticks;								/* awake ticks */
-
+	int64_t awake_ticks;				/* awake ticks */
+                                                                                                                                                                                                                                                                                                                                                                                                    
 	/* Shared between thread.c and synch.c(semaphore->waiters). */
 	struct list_elem elem;              /* List element. */
 
@@ -102,6 +105,10 @@ struct thread {
 	struct lock *wait_on_lock;
 	struct list donations;				
 	struct list_elem donation_elem;
+
+	int exit_status; //스레드 구조체 수정 -> _exit(), _wait()에 사용
+	struct file **fdt;
+	int next_fd;
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
@@ -114,8 +121,25 @@ struct thread {
 
 	/* Owned by thread.c. */
 	struct intr_frame tf;               /* Information for switching */
+	// 자식 프로세스 생성시 지금은 fork를 수행하면서 context switch가 일어난 상태로
+	// 현재 부모에는 커널이 작업하던 정보가 저장되어 있음
+	// 따라서 syscall에서 f를 fork 함수에 전달해서 활용해야 한다.
+	struct intr_frame parent_if;
+	// 자식 지정 리스트를 설정하기 위한 필드 child_list, child_elem을 추가한다
+	struct list child_list;
+	struct list_elem child_elem;
+	// 부모는 이 load가 완료될 때까지 대기해야함
+	// semaphore를 활용해 Load가 완료될 때까지 부모를 재우자
+	struct semaphore load_sema;
+	struct semaphore exit_sema;
+	struct semaphore wait_sema;
+
+	struct file *running;
 	unsigned magic;                     /* Detects stack overflow. */
+
 };
+
+struct thread *get_child_process(int pid);
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
