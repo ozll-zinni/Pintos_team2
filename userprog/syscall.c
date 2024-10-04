@@ -8,6 +8,9 @@
 #include "threads/flags.h"
 #include "intrinsic.h"
 #include "filesys/filesys.h"
+#include "threads/synch.h"
+#include "userprog/process.h"
+#include "filesys/file.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -17,6 +20,8 @@ void halt(void);
 void exit(int status);
 bool create(const char *file, unsigned initial_size);
 bool remove(const char *filename);
+int open(const char *filename);
+int read (int fd, void *buffer, unsigned size);
 /* System call.
  *
  * Previously system call services was handled by the interrupt handler
@@ -76,7 +81,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			char *filename = f->R.rdi;
 			remove(filename);
 		} /* Delete a file. */
-		// case SYS_OPEN : open();  /* Open a file. */
+		case SYS_OPEN : open(f->R.rdi);  /* Open a file. */
 		// case SYS_FILESIZE : filesize(); /* Obtain a file's size. */
 		// case SYS_READ : read(); /* Read from a file. */
 		// case SYS_WRITE : write();  /* Write to a file. */
@@ -108,9 +113,9 @@ halt(void){
 
 void
 exit(int status){
-	struct thread *curr = thread_current();
-	printf("%s:exit(%d)", curr->name, status);
-	thread_exit();
+    struct thread *curr = thread_current();
+    curr->exit_status = status;
+    thread_exit(); // 정상적으로 종료되었으면 0
 }
 
 bool
@@ -123,3 +128,84 @@ remove(const char *filename){
 	return filesys_remove(filename);
 }
 
+int open(const char *filename)
+{
+
+/* 파일을 open */
+/* 해당 파일 객체에 파일 디스크립터 부여 */
+/* 파일 디스크립터 리턴 */
+/* 해당 파일이 존재하지 않으면-1 리턴 */
+
+	// 사용자로부터 전달된 filename 포인터가 유효한지 검증
+	if (filename == NULL || !is_user_vaddr(filename)) {
+			return -1;  // 유효하지 않은 파일 이름일 경우
+	}
+
+	// 파일 열기 시도
+	struct file *file = filesys_open(filename);
+	if (file == NULL) {
+			return -1;  // 파일을 열지 못했을 경우
+	}
+
+	// 현재 스레드의 파일 디스크립터 테이블에 파일 추가
+	struct thread *cur = thread_current();
+	int fd = process_add_file(file);
+	if (fd == -1) {
+			file_close(file);  // 파일 디스크립터 할당에 실패하면 파일을 닫음
+	}
+    return fd;  // 성공적으로 파일을 열었으면 fd 반환
+}
+
+int exec(char *cmd_line){
+    // cmd_line이 유효한 사용자 주소인지 확인 -> 잘못된 주소인 경우 종료/예외 발생
+    check_address(cmd_line);
+    // process.c 파일의 process_create_initd 함수와 유사하다.
+    // 단, 스레드를 새로 생성하는 건 fork에서 수행하므로
+    // exec는 이미 존재하는 프로세스의 컨텍스트를 교체하는 작업을 하므로
+    // 현재 프로세스의 주소 공간을 교체하여 새로운 프로그램을 실행
+    // 이 함수에서는 새 스레드를 생성하지 않고 process_exec을 호출한다.
+    // process_exec 함수 안에서 filename을 변경해야 하므로
+    // 커널 메모리 공간에 cmd_line의 복사본을 만든다.
+    // (현재는 const char* 형식이기 때문에 수정할 수 없다.)
+    char *cmd_line_copy;
+    cmd_line_copy = palloc_get_page(0);
+    if (cmd_line_copy == NULL)
+        exit(-1);                             // 메모리 할당 실패 시 status -1로 종료한다.
+    strlcpy(cmd_line_copy, cmd_line, PGSIZE); // cmd_line을 복사한다.
+    // 스레드의 이름을 변경하지 않고 바로 실행한다.
+    if (process_exec(cmd_line_copy) == -1)
+        exit(-1); // 실패 시 status -1로 종료한다.
+}
+
+int read (int fd, void *buffer, unsigned size)
+ {
+	struct thread *curr = thread_current();
+	struct file *file = curr->fd_table[fd];
+	int file_bytes;
+	if(fd < 0 || fd >= MAX_FD){
+		return -1;
+	}
+
+	if (fd == 0) {
+		for(unsigned i = 0; i < size; i++)
+		{
+			((uint8_t *)buffer)[i] = input_getc();
+		}
+
+		file_bytes = size;
+	} else if(fd >= 2){
+		lock_acquire(&file_lock);
+		file_bytes = (int)file_read(file, buffer, size);
+		lock_release(&file_lock);
+	}
+	//todo fd = 1인경우?
+	return file_bytes;
+	
+
+ /* 파일에 동시 접근이 일어날 수 있으므로 Lock 사용 */
+ /* 파일 디스크립터를 이용하여 파일 객체 검색 */
+ /* 파일 디스크립터가 0일 경우 키보드에 입력을 버퍼에 저장 후
+버퍼의 저장한 크기를 리턴 (input_getc() 이용) */
+ /* 파일 디스크립터가 0이 아닐 경우 파일의 데이터를 크기만큼 저
+장 후 읽은 바이트 수를 리턴 */
+ }

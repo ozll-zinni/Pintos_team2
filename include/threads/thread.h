@@ -26,6 +26,7 @@ typedef int tid_t;
 #define PRI_MIN 0                       /* Lowest priority. */
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
+#define MAX_FD 128
 
 /* A kernel thread or user process.
  *
@@ -102,6 +103,12 @@ struct thread {
 	struct lock *wait_on_lock;
 	struct list donations;				
 	struct list_elem donation_elem;
+
+
+	int fd;
+	struct file *fd_table[MAX_FD];	
+	
+	int exit_status;
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
