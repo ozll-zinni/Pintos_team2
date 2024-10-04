@@ -196,6 +196,7 @@ int process_exec(void *f_name) {
         palloc_free_page(file_name);
         return -1;
     }
+	printf("Index after parsing: %d\n", index);
 
     argument_stack(parse, index, &_if.rsp);  // 인자를 스택에 적재
     hex_dump(_if.rsp, _if.rsp, USER_STACK -_if.rsp, true); // user stack을 16진수로 프린트
@@ -212,18 +213,15 @@ int process_exec(void *f_name) {
 
 void 
 argument_stack(char **parse, int count, void **rsp) {
-    uintptr_t argv_addr[14];  // 각 인자의 주소를 저장할 배열
+    uintptr_t *argv_addr = malloc(sizeof(uintptr_t) * count);  // 동적 할당
     int len;
 
     // 1. 프로그램 이름 및 인자(문자열) 스택에 push
-    for (int i = count-1; i >= 0; i--) {
+    for (int i = count - 1; i >= 0; i--) {
         len = strlen(parse[i]) + 1;  // 널 문자 포함 길이
         *rsp -= len;  // 스택 포인터 이동
 
-        // 문자열을 한 글자씩 스택에 복사
-        for (int j = 0; j < len; j++) {
-            ((char *)(*rsp))[j] = parse[i][j];
-        }
+        memcpy((char *)(*rsp), parse[i], len);  // memcpy 사용
 
         argv_addr[i] = (uintptr_t)(*rsp);  // 각 인자의 주소 저장
     }
@@ -249,11 +247,15 @@ argument_stack(char **parse, int count, void **rsp) {
     // 6. argc (인자의 개수) 스택에 push
     *rsp -= sizeof(int);
     *(int *)(*rsp) = count;
- 
+
     // 7. fake return address 추가
     *rsp -= sizeof(void *);
     *(void **)(*rsp) = 0;
+
+    // 동적 할당 해제
+    free(argv_addr);
 }
+
 
 int 
 process_add_file(struct file *f){

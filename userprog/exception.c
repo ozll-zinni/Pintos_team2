@@ -140,13 +140,11 @@ page_fault (struct intr_frame *f) {
 	write = (f->error_code & PF_W) != 0;
 	user = (f->error_code & PF_U) != 0;
 	uint64_t previous_rax = f->R.rax;
-	if(is_kernel_vaddr(f->rip)){
-		f->R.rax = -1;
-		exit(-1);
-	} else {
-		f->R.rax = 0;
-	}
-	f->rip = previous_rax;
+    if (is_kernel_vaddr(f->rip)) {
+        printf("Kernel page fault at %p. Halting system.\n", fault_addr);
+        PANIC("Kernel page fault");
+    }
+	
 #ifdef VM
 	/* For project 3 and later. */
 	if (vm_try_handle_fault (f, fault_addr, user, write, not_present))

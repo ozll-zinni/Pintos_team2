@@ -5,8 +5,8 @@
 my_program
 
 # Build directories
-/build/
-/bin/
+*/build/*
+*/bin/*
 
 # Debug and log files
 *.log

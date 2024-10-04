@@ -12,7 +12,6 @@
 #include "threads/vaddr.h"
 #include "intrinsic.h"
 #ifdef USERPROG
-#include "userprog/syscall.h"
 #include "userprog/process.h"
 #endif
 
@@ -113,7 +112,6 @@ thread_init (void) {
 
 	/* Init the global thread context */
 	lock_init (&tid_lock);
-	lock_init (&file_lock);
 	list_init (&ready_list);
 	list_init (&destruction_req);
 	list_init (&wait_list);
@@ -212,6 +210,7 @@ thread_create (const char *name, int priority,
 	t->tf.eflags = FLAG_IF;
 
     // 파일 디스크립터 테이블 초기화
+	
     for (int i = 0; i < MAX_FD; i++) {
         t->fd_table[i] = NULL;  // 모든 파일 엔트리를 초기화
     }
@@ -504,6 +503,11 @@ init_thread (struct thread *t, const char *name, int priority) {
 
 	t->wait_on_lock = NULL;
 	t->init_priority = priority;
+	t->wait_on_lock = NULL;
+	list_init(&(t->donations));
+
+	t->exit_status = 0;//해당 구조체 멤버값을 인자로 받은 status을 넣어준 뒤 thread_exit()을 실행한다
+	t->fd = 2;
 
 	t->exit_status = 0;//해당 구조체 멤버값을 인자로 받은 status을 넣어준 뒤 thread_exit()을 실행한다
 
