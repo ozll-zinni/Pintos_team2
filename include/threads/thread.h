@@ -27,6 +27,7 @@ typedef int tid_t;
 #define PRI_MIN 0                       /* Lowest priority. */
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
+#define MAX_FD 128
 
 #define FDT_PAGES 2
 #define FDT_COUNT_LIMIT 128
@@ -106,9 +107,9 @@ struct thread {
 	struct list donations;				
 	struct list_elem donation_elem;
 
+	int fd;
+	struct file *fd_table[MAX_FD];	
 	int exit_status; //스레드 구조체 수정 -> _exit(), _wait()에 사용
-	struct file **fdt;
-	int next_fd;
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */

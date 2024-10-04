@@ -83,6 +83,11 @@
     "syscall.h": "c",
     "intr-stubs.h": "c",
     "stddef.h": "c",
+    "exception.h": "c",
+    "inttypes.h": "c",
+    "syscall-nr.h": "c",
+    "list.h": "c",
+    "stdbool.h": "c",
     "stdint.h": "c"
   }
 }

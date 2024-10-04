@@ -243,8 +243,9 @@ int process_exec(void *f_name) {
     char *token;
     char *parse[14];  // 파싱한 인자들을 저장할 배열
     int index = 0;
+    printf("f_name address: %p, file_name address: %p\n", f_name, file_name);
+    printf("File name before parsing: %s\n", file_name);
 
-	printf("File name before parsing: %s\n", file_name);
     token = strtok_r(file_name, " ", &saveptr);
 	printf("Tokenized argument 0: %p\n", &token);
     while (token != NULL && index < 14) {
@@ -312,12 +313,49 @@ argument_stack(char **parse, int count, void **rsp) {
     // 6. argc (인자의 개수) 스택에 push
     *rsp -= sizeof(int);
     *(int *)(*rsp) = count;
-
+ 
     // 7. fake return address 추가
     *rsp -= sizeof(void *);
     *(void **)(*rsp) = 0;
 }
 
+int 
+process_add_file(struct file *f){
+    struct thread *cur = thread_current();
+    // fd_table에서 빈 자리를 찾아 파일 포인터 저장
+    for (int fd = cur->fd; fd < MAX_FD; fd++) {
+        if (cur->fd_table[fd] == NULL) {
+            cur->fd_table[fd] = f;  // 파일 디스크립터 테이블에 파일 저장
+            cur->fd = fd + 1;  // 다음에 할당할 fd 업데이트
+            return fd;  // fd 반환
+        }
+    }
+    return -1;  // 테이블이 가득 찬 경우
+}
+
+struct 
+file *process_get_file(int fd){
+	struct thread *curr = thread_current(); // 현재 스레드(프로세스) 가져오기
+
+    // fd가 유효한지 확인
+    if (fd < 0 || fd >= MAX_FD) { // FD_COUNT는 파일 디스크립터의 최대 개수
+        return NULL; // 유효하지 않은 fd일 경우 NULL 반환
+    }
+
+    return curr->fd_table[fd]; // 해당 fd의 파일 객체 반환
+}
+
+void
+process_close_file(int fd){
+	struct thread *curr = thread_current();
+	struct file *file = process_get_file(fd);
+
+	if(file == NULL){
+		return;
+	}
+	file_close(fd);
+	curr->fd_table[fd] = NULL;
+}
 
 /* Waits for thread TID to die and returns its exit status.  If
  * it was terminated by the kernel (i.e. killed due to an
@@ -344,6 +382,7 @@ process_wait (tid_t child_tid UNUSED) {
 }
 
 /* Exit the process. This function is called by thread_exit (). */
+
 void process_exit(void)
 {
     struct thread *curr = thread_current();
@@ -357,6 +396,7 @@ void process_exit(void)
     sema_up(&curr->wait_sema);
     // 4) 부모의 signal을 기다린다. 대기가 풀리고 나서 do_schedule(THREAD_DYING)이 이어져 다른 스레드가 실행된다.
     sema_down(&curr->exit_sema);
+
 }
 
 /* Free the currrent process's resources. */
