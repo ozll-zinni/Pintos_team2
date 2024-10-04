@@ -507,7 +507,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 	list_init(&(t->donations));
 
 	t->exit_status = 0;//해당 구조체 멤버값을 인자로 받은 status을 넣어준 뒤 thread_exit()을 실행한다
-	t->next_fd = 2;
+	t->fd = 2;
 
 	t->exit_status = 0;//해당 구조체 멤버값을 인자로 받은 status을 넣어준 뒤 thread_exit()을 실행한다
 
