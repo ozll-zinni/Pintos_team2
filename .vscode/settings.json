@@ -89,5 +89,6 @@
     "list.h": "c",
     "stdbool.h": "c",
     "stdint.h": "c"
-  }
+  },
+  "C_Cpp.dimInactiveRegions": true
 }

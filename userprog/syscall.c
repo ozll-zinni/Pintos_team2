@@ -60,16 +60,11 @@ syscall_init (void) {
 /* The main system call interface */
 void
 syscall_handler (struct intr_frame *f UNUSED) {
-	// TODO: Your implementation goes here.
-	uint64_t *sp = f->rsp;
-	printf("rsp: %p\n", sp);
-	check_address(sp);
-	int syscall_number = *sp;
-	printf("System call number: %d\n", syscall_number);
-
-
-	printf ("system call!\n");
-	switch(syscall_number){
+	int syscall_number = f->R.rax; /* 시스템 콜 넘버 */
+	#ifdef VM
+		thread_current()->rsp = f->rsp;
+	#endif
+		switch(syscall_number){
 		case SYS_HALT :	
 			halt(); /* Halt the operating system. */
 		case SYS_EXIT : 
@@ -136,33 +131,6 @@ exit(int status){
 	thread_exit(); // 정상적으로 종료되었으면 0
 }
 
-int exec(char *cmd_line){
-	// cmd_line이 유효한 사용자 주소인지 확인 -> 잘못된 주소인 경우 종료/예외 발생
-	check_address(cmd_line);
-
-	// process.c 파일의 process_create_initd 함수와 유사하다.
-	// 단, 스레드를 새로 생성하는 건 fork에서 수행하므로
-	// exec는 이미 존재하는 프로세스의 컨텍스트를 교체하는 작업을 하므로
-	// 현재 프로세스의 주소 공간을 교체하여 새로운 프로그램을 실행
-	// 이 함수에서는 새 스레드를 생성하지 않고 process_exec을 호출한다.
-
-	
-	// process_exec 함수 안에서 filename을 변경해야 하므로
-	// 커널 메모리 공간에 cmd_line의 복사본을 만든다.
-	// (현재는 const char* 형식이기 때문에 수정할 수 없다.)
-	char *cmd_line_copy;
-	cmd_line_copy = palloc_get_page(0);
-	if (cmd_line_copy == NULL)
-		exit(-1);							  // 메모리 할당 실패 시 status -1로 종료한다.
-	strlcpy(cmd_line_copy, cmd_line, PGSIZE); // cmd_line을 복사한다.
-
-
-	// 스레드의 이름을 변경하지 않고 바로 실행한다.
-	if (process_exec(cmd_line_copy) == -1)
-		exit(-1); // 실패 시 status -1로 종료한다.
-}
-
-
 bool
 create(const char *filename, unsigned initial_size){
 	return filesys_create(filename, initial_size);
@@ -201,26 +169,23 @@ int open(const char *filename)
     return fd;  // 성공적으로 파일을 열었으면 fd 반환
 }
 
-// int exec(char *cmd_line){
-//     // cmd_line이 유효한 사용자 주소인지 확인 -> 잘못된 주소인 경우 종료/예외 발생
-//     check_address(cmd_line);
-//     // process.c 파일의 process_create_initd 함수와 유사하다.
-//     // 단, 스레드를 새로 생성하는 건 fork에서 수행하므로
-//     // exec는 이미 존재하는 프로세스의 컨텍스트를 교체하는 작업을 하므로
-//     // 현재 프로세스의 주소 공간을 교체하여 새로운 프로그램을 실행
-//     // 이 함수에서는 새 스레드를 생성하지 않고 process_exec을 호출한다.
-//     // process_exec 함수 안에서 filename을 변경해야 하므로
-//     // 커널 메모리 공간에 cmd_line의 복사본을 만든다.
-//     // (현재는 const char* 형식이기 때문에 수정할 수 없다.)
-//     char *cmd_line_copy;
-//     cmd_line_copy = palloc_get_page(0);
-//     if (cmd_line_copy == NULL)
-//         exit(-1);                             // 메모리 할당 실패 시 status -1로 종료한다.
-//     strlcpy(cmd_line_copy, cmd_line, PGSIZE); // cmd_line을 복사한다.
-//     // 스레드의 이름을 변경하지 않고 바로 실행한다.
-//     if (process_exec(cmd_line_copy) == -1)
-//         exit(-1); // 실패 시 status -1로 종료한다.
-// }
+int exec(char *cmd_line){
+    check_address(cmd_line);
+	// process.c의 process_created_initd와 유사함
+	// 스레드를 생성하는건 fork에서 하므로, 이 함수에서는 새 스레드를 생성하지 않고 process_exec을 호출한다
+
+	// process_exec에서 filename을 변경해야 하므로
+	// 커널 메모리 공간에 cmd_line의 복사본을 만든다
+	char *cmd_line_copy;
+	cmd_line_copy = palloc_get_page(0);
+	if (cmd_line_copy == NULL)
+		exit(-1);
+	// 메모리 할당 실패 시 status -1로 종료한다
+	strlcpy(cmd_line_copy, cmd_line, PGSIZE);
+
+	if(process_exec(cmd_line_copy) == -1)
+		exit(-1);
+}
 
 int read (int fd, void *buffer, unsigned size)
  {
