@@ -144,14 +144,14 @@ void
 check_address(void *addr){
 
 if (addr == NULL || !is_user_vaddr(addr)) {
-	 printf("Invalid address: %p\n", addr);
+	//  printf("Invalid address: %p\n", addr);
     exit(-1);
 }
 }
 
 void 
 halt(void){
-	printf("Halt called, shutting down...\n");
+	// printf("Halt called, shutting down...\n");
 	power_off();
 }
 
@@ -159,7 +159,7 @@ void
 exit(int status){
 	struct thread *curr = thread_current();
 	curr->exit_status = status;
-	printf("%s: exit%d\n", curr->name, status);
+	printf("%s: exit(%d)\n", curr->name, status);
 	thread_exit(); // 정상적으로 종료되었으면 0
 }
 

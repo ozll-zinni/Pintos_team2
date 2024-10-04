@@ -50,7 +50,6 @@ process_create_initd (const char *file_name) {
 	if (fn_copy == NULL)
 		return TID_ERROR;
 	strlcpy (fn_copy, file_name, PGSIZE);
-	printf("fn_copy: %s\n", fn_copy); 
 
 	char *process_name = strtok_r(file_name, " ", &saveptr);
 
@@ -253,9 +252,6 @@ int process_exec(void *f_name) {
     char *parse[30];  // 파싱한 인자들을 저장할 배열
     int index = 0;
 
-	printf("f_name address: %p, file_name address: %p\n", f_name, file_name);
-    printf("File name before parsing: %s\n", file_name);
-
 	for (token = strtok_r (file_name, " ", &saveptr); token != NULL; 
 	token = strtok_r (NULL, " ", &saveptr)){
 		
@@ -279,7 +275,7 @@ int process_exec(void *f_name) {
     }
 
     argument_stack(&_if, index, parse);  // 인자를 스택에 적재
-    hex_dump(_if.rsp, _if.rsp, USER_STACK -_if.rsp, true); // user stack을 16진수로 프린트
+    // hex_dump(_if.rsp, _if.rsp, USER_STACK -_if.rsp, true); // user stack을 16진수로 프린트
 
 
     // palloc_free_page(file_name);
