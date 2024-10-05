@@ -227,8 +227,6 @@ thread_create (const char *name, int priority,
 	/* Add to run queue. */
 	thread_unblock (t);
 
-	list_push_back(&thread_current()->child_list, &t->child_elem);
-
 	if (priority > thread_get_priority()){
 		thread_yield();
 	}
