@@ -247,18 +247,27 @@ error:
 int process_exec(void *f_name) {
     char *file_name = f_name;
     bool success;
-	char *saveptr;
+		char *saveptr;
     char *token;
     char *parse[30];  // 파싱한 인자들을 저장할 배열
     int index = 0;
 
-	for (token = strtok_r (file_name, " ", &saveptr); token != NULL; 
-	token = strtok_r (NULL, " ", &saveptr)){
-		
-		parse[index] = token;
-		index++;
+		// for (token = strtok_r (file_name, " ", &saveptr); token != NULL; 
+		// token = strtok_r (NULL, " ", &saveptr)){
+			
+		// 	parse[index] = token;
+		// 	index++;
 
-	}
+		// }
+
+		token = strtok_r(file_name, " ", &saveptr);
+		//printf("Tokenized argument 0: %p\n", &token);
+    while (token != NULL && index < 14) {
+        parse[index] = token;
+				//printf("Tokenized argument %d: %s\n", index, parse[index]);
+				index++;
+        token = strtok_r(NULL, " ", &saveptr);
+    }
 
     struct intr_frame _if;
     _if.ds = _if.es = _if.ss = SEL_UDSEG;
@@ -267,59 +276,104 @@ int process_exec(void *f_name) {
 
     process_cleanup();
 	
-
     success = load(file_name, &_if);  // 첫 번째 인자(프로그램 이름)를 사용
     if (!success) {
         palloc_free_page(file_name);
         return -1;
     }
 
-    argument_stack(&_if, index, parse);  // 인자를 스택에 적재
+    argument_stack(parse, index, &_if.rsp);  // 인자를 스택에 적재
     // hex_dump(_if.rsp, _if.rsp, USER_STACK -_if.rsp, true); // user stack을 16진수로 프린트
 
-
-    // palloc_free_page(file_name);
-    // if (!success) {
-    //     return -1;
-    // }
+		// rdi에는 인자의 개수(argc)를 담고, rsi에는 첫 번째 인자의 주소가 저장되어 있는 스택에서의 주소를 담음
+		_if.R.rdi = index;
+		_if.R.rsi = _if.rsp + sizeof(void*);
+    palloc_free_page(file_name);
 
     do_iret(&_if);
     NOT_REACHED();
 }
 
-static void argument_stack(struct intr_frame *if_, int argv_cnt, char **argv_list) {
-	int i;
-	char *argu_addr[128];
-	int argc_len;
+// 우리가 짠 strlcpy 버전
+void 
+argument_stack(char **parse, int count, void **rsp) {
+    uintptr_t argv_addr[14];  // 각 인자의 주소를 저장할 배열
+    int len;
 
-	for (i = argv_cnt-1; i >= 0; i--){
-		argc_len = strlen(argv_list[i]);
-		if_->rsp = if_->rsp - (argc_len+1); 
-		memcpy(if_->rsp, argv_list[i], (argc_len+1));
-		argu_addr[i] = if_->rsp;
-	}
+    // 1. 프로그램 이름 및 인자(문자열) 스택에 push
+    for (int i = count-1; i >= 0; i--) {
+        len = strlen(parse[i]) + 1;  // 널 문자 포함 길이
+        *rsp -= len;  // 스택 포인터 이동
 
-	while (if_->rsp%8 != 0){
-		if_->rsp--;
-		memset(if_->rsp, 0, sizeof(uint8_t));
-	}
+        // 문자열을 한 글자씩 스택에 복사
+        for (int j = 0; j < len; j++) {
+            ((char *)(*rsp))[j] = parse[i][j];
+        }
 
-	for (i = argv_cnt; i>=0; i--){
-		if_->rsp = if_->rsp - 8;
-		if (i == argv_cnt){
-			memset(if_->rsp, 0, sizeof(char **));
-		}else{
-			memcpy(if_->rsp, &argu_addr[i] , sizeof(char **));
-		}
-	}
+        argv_addr[i] = (uintptr_t)(*rsp);  // 각 인자의 주소 저장
+    }
 
-	if_->rsp = if_->rsp - 8;
-	memset(if_->rsp, 0, sizeof(void *));
+    // 2. 8바이트 정렬을 위해 패딩 추가
+    *rsp = (void *)((uintptr_t)(*rsp) & ~0x7); // 8바이트 기준으로 정렬!! 원래 16바이트로 정렬하고 있었음...ㅇㅁㅇ
 
-	if_->R.rdi = argv_cnt;
-	if_->R.rsi = if_->rsp + 8;	
+    // 3. NULL 포인터 추가
+    *rsp -= sizeof(char *);
+    *(char **)(*rsp) = 0;
 
+    // 4. 인자 주소를 스택에 push
+    for (int i = count - 1; i >= 0; i--) {
+        *rsp -= sizeof(char *);
+        *(char **)(*rsp) = (char *)argv_addr[i];
+    }
+
+    // 5. argv 포인터 스택에 push -> 4번에서 이미 해줌!!
+    // char **argv = *rsp;
+    // *rsp -= sizeof(char **);
+    // *(char ***)(*rsp) = argv;
+
+    // 6. argc (인자의 개수) 스택에 push -> 담을 필요 없음!!
+    // *rsp -= sizeof(int);
+    // *(int *)(*rsp) = count;
+
+    // 7. fake return address 추가
+    *rsp -= sizeof(void *);
+    *(void **)(*rsp) = 0;
 }
+
+// 대호 오빠가 가져온 memcpy 버전
+// static void argument_stack(struct intr_frame *if_, int argv_cnt, char **argv_list) {
+// 	int i;
+// 	char *argu_addr[128];
+// 	int argc_len;
+
+// 	for (i = argv_cnt-1; i >= 0; i--){
+// 		argc_len = strlen(argv_list[i]);
+// 		if_->rsp = if_->rsp - (argc_len+1); 
+// 		memcpy(if_->rsp, argv_list[i], (argc_len+1));
+// 		argu_addr[i] = if_->rsp;
+// 	}
+
+// 	while (if_->rsp%8 != 0){
+// 		if_->rsp--;
+// 		memset(if_->rsp, 0, sizeof(uint8_t));
+// 	}
+
+// 	for (i = argv_cnt; i>=0; i--){
+// 		if_->rsp = if_->rsp - 8;
+// 		if (i == argv_cnt){
+// 			memset(if_->rsp, 0, sizeof(char **));
+// 		}else{
+// 			memcpy(if_->rsp, &argu_addr[i] , sizeof(char **));
+// 		}
+// 	}
+
+// 	if_->rsp = if_->rsp - 8;
+// 	memset(if_->rsp, 0, sizeof(void *));
+
+// 	if_->R.rdi = argv_cnt;
+// 	if_->R.rsi = if_->rsp + 8;	
+
+// }
 
 
 /* Waits for thread TID to die and returns its exit status.  If
