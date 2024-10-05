@@ -11,6 +11,7 @@
 #include "threads/synch.h"
 #include "userprog/process.h"
 #include "filesys/file.h"
+#include "threads/palloc.h"
 struct lock filesys_lock;
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -215,7 +216,7 @@ exec(char *cmd_line){
 	// process_exec에서 filename을 변경해야 하므로
 	// 커널 메모리 공간에 cmd_line의 복사본을 만든다
 	int size = strlen(cmd_line) +1;
-	char *cmd_line_copy = palloc_get_page(0);
+	char *cmd_line_copy = palloc_get_page(PAL_ZERO);
 	if (cmd_line_copy == NULL){
 		exit(-1);
 	}

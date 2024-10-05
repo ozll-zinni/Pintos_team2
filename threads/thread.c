@@ -524,20 +524,19 @@ init_thread (struct thread *t, const char *name, int priority) {
 
 	t->init_priority = priority;
 	t->wait_on_lock = NULL;
-	list_init(&(t->donations));
+	list_init(&t->donations);
 
 	t->exit_status = 0;//해당 구조체 멤버값을 인자로 받은 status을 넣어준 뒤 thread_exit()을 실행한다
 	t->fd = 2;
 
-	t->exit_status = 0;//해당 구조체 멤버값을 인자로 받은 status을 넣어준 뒤 thread_exit()을 실행한다
-
 	// t->donation_elem.prev = list_head;
 	// t->donation_elem.next = list_tail;
+	list_init(&t->child_list);
 	sema_init(&t->load_sema, 0);
 	sema_init(&t->exit_sema, 0);
 	sema_init(&t->wait_sema, 0);
-	list_init(&(t->child_list));
 
+	t->running = NULL;
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
