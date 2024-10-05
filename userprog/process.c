@@ -113,7 +113,9 @@ struct thread * get_child_process(int pid){
 	struct thread *cur = thread_current();
 	struct list *child_list = &cur->child_list;
 	struct list_elem *e;
-	if (list_empty(child_list)) return NULL;
+	if (list_empty(child_list)){
+		return NULL;
+	}
 	for (e = list_begin (child_list); e != list_end (child_list); e = list_next (e)){
 		struct thread *t = list_entry(e, struct thread, child_elem);
 		if (t->tid == pid){

@@ -20,7 +20,7 @@ void check_address(void *addr);
 void get_argument(void *rsp, int *arg, int count);
 void halt(void);
 void exit(int status);
-int exec(char *cmd_line);
+tid_t exec(char *cmd_line);
 int fork(const char * thread_name, struct intr_frame *f);
 int wait(int pid);
 bool create(const char *file, unsigned initial_size);
@@ -206,22 +206,27 @@ int open(const char *filename)
 
 }
 
-int exec(char *cmd_line){
+tid_t
+exec(char *cmd_line){
     check_address(cmd_line);
 	// process.c의 process_created_initd와 유사함
 	// 스레드를 생성하는건 fork에서 하므로, 이 함수에서는 새 스레드를 생성하지 않고 process_exec을 호출한다
 
 	// process_exec에서 filename을 변경해야 하므로
 	// 커널 메모리 공간에 cmd_line의 복사본을 만든다
-	char *cmd_line_copy;
-	cmd_line_copy = palloc_get_page(0);
-	if (cmd_line_copy == NULL)
+	int size = strlen(cmd_line) +1;
+	char *cmd_line_copy = palloc_get_page(0);
+	if (cmd_line_copy == NULL){
 		exit(-1);
+	}
 	// 메모리 할당 실패 시 status -1로 종료한다
-	strlcpy(cmd_line_copy, cmd_line, PGSIZE);
+	strlcpy(cmd_line_copy, cmd_line, size);
 
-	if(process_exec(cmd_line_copy) == -1)
-		exit(-1);
+	if(process_exec(cmd_line_copy) == -1){
+		return -1;
+	}
+	NOT_REACHED();
+	return 0;
 }
 
 int read (int fd, void *buffer, unsigned size)
