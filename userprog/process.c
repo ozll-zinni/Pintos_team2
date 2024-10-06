@@ -612,7 +612,11 @@ load (const char *file_name, struct intr_frame *if_) {
 				break;
 		}
 	}
-
+	// 스레드가 삭제될 때 파일을 닫을 수 있게 구조체에 파일을 저장해둔다.
+	t->running = file;
+	// 현재 실행중인 파일은 수정할 수 없게 막는다.
+	file_deny_write(file);
+	
 	/* Set up stack. */
 	if (!setup_stack (if_))
 		goto done;
@@ -627,7 +631,7 @@ load (const char *file_name, struct intr_frame *if_) {
 
 done:
 	/* We arrive here whether the load is successful or not. */
-	file_close (file);
+	// file_close (file);
 	return success;
 }
 
