@@ -70,6 +70,7 @@ syscall_init (void) {
 void
 syscall_handler (struct intr_frame *f UNUSED) {
 	// TODO: Your implementation goes here.
+	
 	int sys_number = f->R.rax;
 	switch (sys_number){
 
@@ -312,10 +313,14 @@ int write(int fd, void *buffer, unsigned size)
 void 
 seek(int fd, unsigned position){
 	struct file *file = process_get_file(fd);
-	if(fd < 2){
-		return;
+	// if(fd < 2){
+	// 	return;
+	// }
+	// file_seek(&file, position);
+
+	if(file != NULL){
+		file_seek(file, position);
 	}
-	file_seek(&file, position);
 }
 
 unsigned 
