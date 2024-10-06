@@ -262,7 +262,7 @@ int process_exec(void *f_name) {
 
 		token = strtok_r(file_name, " ", &saveptr);
 		//printf("Tokenized argument 0: %p\n", &token);
-    while (token != NULL && index < 14) {
+    while (token != NULL && index < 30) {
         parse[index] = token;
 				//printf("Tokenized argument %d: %s\n", index, parse[index]);
 				index++;
@@ -276,9 +276,9 @@ int process_exec(void *f_name) {
 
     process_cleanup();
 	
-    success = load(file_name, &_if);  // 첫 번째 인자(프로그램 이름)를 사용
+    success = load(parse[0], &_if);  // 첫 번째 인자(프로그램 이름)를 사용
     if (!success) {
-        palloc_free_page(file_name);
+        palloc_free_page(parse[0]);
         return -1;
     }
 
@@ -297,7 +297,7 @@ int process_exec(void *f_name) {
 // 우리가 짠 strlcpy 버전
 void 
 argument_stack(char **parse, int count, void **rsp) {
-    uintptr_t argv_addr[14];  // 각 인자의 주소를 저장할 배열
+    char* argv_addr[30];  // 각 인자의 주소를 저장할 배열
     int len;
 
     // 1. 프로그램 이름 및 인자(문자열) 스택에 push
@@ -314,10 +314,14 @@ argument_stack(char **parse, int count, void **rsp) {
     }
 
     // 2. 8바이트 정렬을 위해 패딩 추가
-    *rsp = (void *)((uintptr_t)(*rsp) & ~0x7); // 8바이트 기준으로 정렬!! 원래 16바이트로 정렬하고 있었음...ㅇㅁㅇ
+		size_t padding_size = (uintptr_t)(*rsp) & 0x7;  // 정렬 전 남은 공간 계산
+		*rsp -= padding_size;  // 스택 포인터를 패딩만큼 이동
+
+		// 패딩을 0으로 채우기
+		memset(*rsp, 0, padding_size);
 
     // 3. NULL 포인터 추가
-    *rsp -= sizeof(char *);
+    *rsp -= sizeof(uint8_t*);
     *(char **)(*rsp) = 0;
 
     // 4. 인자 주소를 스택에 push
