@@ -8,16 +8,14 @@
 #include "threads/flags.h"
 #include "intrinsic.h"
 #include "filesys/filesys.h"
-#include "threads/synch.h"
 #include "userprog/process.h"
 #include "filesys/file.h"
 #include "threads/palloc.h"
 
+struct lock filesys_lock;
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
 void check_address(void *addr);
-struct lock filesys_lock;
-
 
 void get_argument(void *rsp, int *arg, int count);
 void halt(void);
@@ -237,7 +235,7 @@ int read (int fd, void *buffer, unsigned size)
 	check_address(buffer);
 	check_address(buffer+size-1);
 	struct thread *curr = thread_current();
-	struct file *file = curr->fd_table[fd];
+	struct file *file = process_get_file(fd);
 	unsigned char *buf = buffer;
 	int file_bytes;
 
@@ -335,6 +333,7 @@ tell (int fd){
 
 void
 close(int fd){
+	if(fd <= 1) return;
 	struct file *file = process_get_file(fd);
 	if(file == NULL)
 	{
