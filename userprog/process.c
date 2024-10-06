@@ -238,9 +238,9 @@ __do_fork (void *aux) {
 	if (succ)
 		do_iret (&if_);
 error:
-	current->exit_status = TID_ERROR;
+	current->exit_status = -1;
 	sema_up(&current->load_sema);
-	exit(TID_ERROR);
+	exit(-1);
 	// thread_exit ();
 }
 
@@ -541,12 +541,16 @@ load (const char *file_name, struct intr_frame *if_) {
 		goto done;
 	process_activate (thread_current ());
 
+
 	/* Open executable file. */
 	file = filesys_open (file_name);
 	if (file == NULL) {
 		printf ("load: %s: open failed\n", file_name);
 		goto done;
 	}
+	t->running = file;
+
+	file_deny_write(file);
 
 	/* Read and verify executable header. */
 	if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
@@ -612,10 +616,6 @@ load (const char *file_name, struct intr_frame *if_) {
 				break;
 		}
 	}
-	// 스레드가 삭제될 때 파일을 닫을 수 있게 구조체에 파일을 저장해둔다.
-	t->running = file;
-	// 현재 실행중인 파일은 수정할 수 없게 막는다.
-	file_deny_write(file);
 	
 	/* Set up stack. */
 	if (!setup_stack (if_))
@@ -632,6 +632,7 @@ load (const char *file_name, struct intr_frame *if_) {
 done:
 	/* We arrive here whether the load is successful or not. */
 	// file_close (file);
+	
 	return success;
 }
 
