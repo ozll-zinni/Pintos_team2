@@ -99,7 +99,7 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 
 	sema_down(&child->load_sema); 
 
-
+	
 	// fork 오류나서 추가한 부분(debug)
 	if (child->exit_status == -1){
 		return TID_ERROR;
@@ -296,52 +296,39 @@ int process_exec(void *f_name) {
     NOT_REACHED();
 }
 
-// 우리가 짠 strlcpy 버전
+
 void 
 argument_stack(char **parse, int count, void **rsp) {
-    char* argv_addr[30];  // 각 인자의 주소를 저장할 배열
-    int len;
+    char* argv_addr[30];  									// array to save addresses of argument strings
+    int len;																// integer to save string legth of each argument string
 
-    // 1. 프로그램 이름 및 인자(문자열) 스택에 push
+    // 1. push program name
     for (int i = count-1; i >= 0; i--) {
-        len = strlen(parse[i]) + 1;  // 널 문자 포함 길이
-        *rsp -= len;  // 스택 포인터 이동
+        len = strlen(parse[i]) + 1;  				// get string length including NULL(\0)
+        *rsp -= len;  							 				// lower stack pointer
 
-        // 문자열을 한 글자씩 스택에 복사
-        for (int j = 0; j < len; j++) {
+        for (int j = 0; j < len; j++) {     // copy each character to stack (can replaced by memcpy)
             ((char *)(*rsp))[j] = parse[i][j];
         }
 
-        argv_addr[i] = (uintptr_t)(*rsp);  // 각 인자의 주소 저장
+        argv_addr[i] = (uintptr_t)(*rsp);   // save the address of string to array
     }
 
-    // 2. 8바이트 정렬을 위해 패딩 추가
-		size_t padding_size = (uintptr_t)(*rsp) & 0x7;  // 정렬 전 남은 공간 계산
-		*rsp -= padding_size;  // 스택 포인터를 패딩만큼 이동
-
-		// 패딩을 0으로 채우기
+    // 2. push padding for 8 bytes address alignment
+		size_t padding_size = (uintptr_t)(*rsp) & 0x7;  
+		*rsp -= padding_size;
 		memset(*rsp, 0, padding_size);
 
-    // 3. NULL 포인터 추가
+    // 3. push NULL pointer which separates argument strings with addresses of them
     *rsp -= sizeof(uint8_t*);
     *(char **)(*rsp) = 0;
 
-    // 4. 인자 주소를 스택에 push
+    // 4. push addresses of argument strings
     for (int i = count - 1; i >= 0; i--) {
         *rsp -= sizeof(char *);
         *(char **)(*rsp) = (char *)argv_addr[i];
     }
-
-    // 5. argv 포인터 스택에 push -> 4번에서 이미 해줌!!
-    // char **argv = *rsp;
-    // *rsp -= sizeof(char **);
-    // *(char ***)(*rsp) = argv;
-
-    // 6. argc (인자의 개수) 스택에 push -> 담을 필요 없음!!
-    // *rsp -= sizeof(int);
-    // *(int *)(*rsp) = count;
-
-    // 7. fake return address 추가
+    // 5. push fake return address
     *rsp -= sizeof(void *);
     *(void **)(*rsp) = 0;
 }
